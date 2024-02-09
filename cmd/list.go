@@ -69,13 +69,38 @@ var listCmd = &cobra.Command{
 		})
 
 		// Print mods
-		if viper.GetBool("list.version") {
-			for _, mod := range mods {
-				fmt.Printf("%s (%s)\n", mod.Name, mod.FileName)
+		for _, mod := range mods {
+			var output string
+			if viper.GetBool("list.version") {
+				output = fmt.Sprintf("%s (%s)", mod.Name, mod.FileName)
+			} else {
+				output = mod.Name
 			}
-		} else {
-			for _, mod := range mods {
-				fmt.Println(mod.Name)
+
+			var provider string
+			if strings.Contains(mod.Download.URL, "cdn.modrinth.com") {
+				provider = "Modrinth"
+			} else if mod.Download.Mode == "metadata:curseforge" {
+				provider = "CurseForge"
+			} else {
+				provider = "Unknown"
+			}
+
+			var slug string
+			slug = strings.FieldsFunc(mod.GetFilePath(), func(r rune) bool {
+				return strings.ContainsRune("/.", r)
+			})[1]
+
+			if viper.GetBool("list.slug") {
+				if viper.GetBool("list.provider") {
+					fmt.Printf("%s: %s\n", provider, slug)
+				} else {
+					fmt.Printf("%s\n", slug)
+				}
+			} else if viper.GetBool("list.provider") {
+				fmt.Printf("%s: %s\n", provider, output)
+			} else {
+				fmt.Println(output)
 			}
 		}
 	},
@@ -109,5 +134,8 @@ func init() {
 	_ = viper.BindPFlag("list.pinned", listCmd.Flags().Lookup("pinned"))
 	listCmd.Flags().Bool("unpinned", false, "Show only unpinned mods")
 	_ = viper.BindPFlag("list.unpinned", listCmd.Flags().Lookup("unpinned"))
-
+	listCmd.Flags().BoolP("slug", "g", false, "List as slugs (file ids)")
+	_ = viper.BindPFlag("list.slug", listCmd.Flags().Lookup("slug"))
+	listCmd.Flags().BoolP("provider", "p", false, "List with mod provider")
+	_ = viper.BindPFlag("list.provider", listCmd.Flags().Lookup("provider"))
 }
