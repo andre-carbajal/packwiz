@@ -86,8 +86,7 @@ var listCmd = &cobra.Command{
 				provider = "Unknown"
 			}
 
-			var slug string
-			slug = strings.FieldsFunc(mod.GetFilePath(), func(r rune) bool {
+			var slug = strings.FieldsFunc(mod.GetFilePath(), func(r rune) bool {
 				return strings.ContainsRune("/.", r)
 			})[1]
 
