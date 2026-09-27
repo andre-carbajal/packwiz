@@ -16,8 +16,8 @@ type IndexPathHolder interface {
 	markMetaFile()
 	markedFound() bool
 	IsMetaFile() bool
-	// Returns Alias if set, otherwise File.
-	AliasPath() string
+	// Returns all aliases, or File when no alias is set.
+	AliasPaths() []string
 }
 
 // indexFile is a file in the index
@@ -53,11 +53,11 @@ func (i *indexFile) IsMetaFile() bool {
 	return i.MetaFile
 }
 
-func (i *indexFile) AliasPath() string {
+func (i *indexFile) AliasPaths() []string {
 	if i.Alias != "" {
-		return i.Alias
+		return []string{i.Alias}
 	}
-	return i.File
+	return []string{i.File}
 }
 
 type indexFileMultipleAlias map[string]indexFile
@@ -98,11 +98,13 @@ func (i *indexFileMultipleAlias) IsMetaFile() bool {
 	panic("No entries in indexFileMultipleAlias")
 }
 
-func (i *indexFileMultipleAlias) AliasPath() string {
+func (i *indexFileMultipleAlias) AliasPaths() []string {
+	paths := make([]string, 0, len(*i))
 	for _, v := range *i {
-		return v.AliasPath()
+		paths = append(paths, v.AliasPaths()...)
 	}
-	panic("No entries in indexFileMultipleAlias")
+	slices.Sort(paths)
+	return slices.Compact(paths)
 }
 
 // updateFileEntry updates the hash of a file and marks as found; adding it if it doesn't exist
