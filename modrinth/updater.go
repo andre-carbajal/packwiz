@@ -3,11 +3,13 @@ package modrinth
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	modrinthApi "codeberg.org/theepicblock/go-modrinth/modrinth"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/mitchellh/mapstructure"
 )
 
 type mrUpdateData struct {
@@ -36,6 +38,23 @@ type cachedStateStore struct {
 	Version   *modrinthApi.Version
 }
 
+var (
+	// ponytail: process-local pacing; cross-process coordination only if
+	// separate packwiz processes are shown to exceed Modrinth's shared IP limit.
+	modrinthCheckRateLimitMu sync.Mutex
+	nextModrinthCheck        time.Time
+)
+
+func waitForModrinthCheckRateLimit() {
+	modrinthCheckRateLimitMu.Lock()
+	defer modrinthCheckRateLimitMu.Unlock()
+
+	if delay := time.Until(nextModrinthCheck); delay > 0 {
+		time.Sleep(delay)
+	}
+	nextModrinthCheck = time.Now().Add(250 * time.Millisecond)
+}
+
 func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateCheck, error) {
 	results := make([]core.UpdateCheck, len(mods))
 
@@ -48,6 +67,7 @@ func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 
 		data := rawData.(mrUpdateData)
 
+		waitForModrinthCheckRateLimit()
 		newVersion, err := getLatestVersion(data.ProjectID, mod.Name, pack)
 		if err != nil {
 			results[i] = core.UpdateCheck{Error: fmt.Errorf("failed to get latest version: %v", err)}

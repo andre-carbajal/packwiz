@@ -989,3 +989,13 @@ func TestMrUpdater_CheckUpdate(t *testing.T) {
 		}
 	})
 }
+
+func TestWaitForModrinthCheckRateLimitSpacesRequests(t *testing.T) {
+	waitForModrinthCheckRateLimit()
+	start := time.Now()
+	waitForModrinthCheckRateLimit()
+
+	if elapsed := time.Since(start); elapsed < 200*time.Millisecond {
+		t.Errorf("rate-limit wait took %s, want at least 200ms", elapsed)
+	}
+}
