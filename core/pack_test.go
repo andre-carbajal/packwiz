@@ -85,15 +85,41 @@ func TestGetPackName(t *testing.T) {
 		want string
 	}{
 		{"empty name falls back to export", Pack{}, "export"},
-		{"name only", Pack{Name: "MyPack"}, "MyPack"},
-		{"name plus version", Pack{Name: "MyPack", Version: "1.0"}, "MyPack-1.0"},
-		{"version without name still falls back", Pack{Version: "1.0"}, "export"},
+		{"name only", Pack{Name: "MyPack"}, "mypack"},
+		{"name plus version", Pack{Name: "MyPack", Version: "1.0"}, "mypack-1.0"},
+		{"version without name still falls back", Pack{Version: "1.0"}, "export-1.0"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.pack.GetPackName(); got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGetSlug(t *testing.T) {
+	cases := []struct {
+		name string
+		want string
+	}{
+		{"empty name", "export"},
+		{"spaces collapse to hyphens", "a-fancy-pack"},
+		{"unicode letters are preserved", "café-pack"},
+		{"punctuation-only names fall back", "export"},
+	}
+	packs := []Pack{
+		{},
+		{Name: "A Fancy Pack!"},
+		{Name: "Café Pack"},
+		{Name: "---"},
+	}
+
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := packs[i].GetSlug(); got != tc.want {
+				t.Errorf("GetSlug() = %q, want %q", got, tc.want)
 			}
 		})
 	}
@@ -134,17 +160,17 @@ func TestCreateExportFile(t *testing.T) {
 	}
 
 	t.Run("default filename", func(t *testing.T) {
-		assertOutput(t, "", filepath.Join(root, "Example-1.2.3.zip"))
+		assertOutput(t, "", filepath.Join(root, "example-1.2.3.zip"))
 	})
 	t.Run("new extensionless directory", func(t *testing.T) {
-		assertOutput(t, "new-output", filepath.Join(root, "new-output", "Example-1.2.3.zip"))
+		assertOutput(t, "new-output", filepath.Join(root, "new-output", "example-1.2.3.zip"))
 	})
 	t.Run("existing directory with extension", func(t *testing.T) {
 		outputDir := filepath.Join(root, "release.v1")
 		if err := os.Mkdir(outputDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		assertOutput(t, outputDir, filepath.Join(outputDir, "Example-1.2.3.zip"))
+		assertOutput(t, outputDir, filepath.Join(outputDir, "example-1.2.3.zip"))
 	})
 	t.Run("existing extensionless file remains a file", func(t *testing.T) {
 		output := filepath.Join(root, "custom-output")
