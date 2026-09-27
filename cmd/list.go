@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -70,39 +71,37 @@ var listCmd = &cobra.Command{
 
 		// Print mods
 		for _, mod := range mods {
-			var output string
-			if viper.GetBool("list.version") {
-				output = fmt.Sprintf("%s (%s)", mod.Name, mod.FileName)
-			} else {
-				output = mod.Name
-			}
-
-			var provider string
-			if strings.Contains(mod.Download.URL, "cdn.modrinth.com") {
-				provider = "Modrinth"
-			} else if mod.Download.Mode == "metadata:curseforge" {
-				provider = "CurseForge"
-			} else {
-				provider = "Unknown"
-			}
-
-			var slug = strings.FieldsFunc(mod.GetFilePath(), func(r rune) bool {
-				return strings.ContainsRune("/.", r)
-			})[1]
-
-			if viper.GetBool("list.slug") {
-				if viper.GetBool("list.provider") {
-					fmt.Printf("%s: %s\n", provider, slug)
-				} else {
-					fmt.Printf("%s\n", slug)
-				}
-			} else if viper.GetBool("list.provider") {
-				fmt.Printf("%s: %s\n", provider, output)
-			} else {
-				fmt.Println(output)
-			}
+			fmt.Println(formatListItem(mod, viper.GetBool("list.version"), viper.GetBool("list.slug"), viper.GetBool("list.provider")))
 		}
 	},
+}
+
+func formatListItem(mod *core.Mod, showVersion, showSlug, showProvider bool) string {
+	output := mod.Name
+	if showVersion {
+		output = fmt.Sprintf("%s (%s)", mod.Name, mod.FileName)
+	}
+	if showSlug {
+		metaPath := mod.GetFilePath()
+		if metaPath == "" {
+			output = ""
+		} else {
+			output = filepath.Base(metaPath)
+			output = strings.TrimSuffix(output, core.MetaExtension)
+			output = strings.TrimSuffix(output, core.MetaExtensionOld)
+		}
+	}
+	if !showProvider {
+		return output
+	}
+
+	provider := "Unknown"
+	if strings.Contains(mod.Download.URL, "cdn.modrinth.com") {
+		provider = "Modrinth"
+	} else if mod.Download.Mode == core.ModeCF {
+		provider = "CurseForge"
+	}
+	return fmt.Sprintf("%s: %s", provider, output)
 }
 
 func filterModsByPinStatus(mods []*core.Mod, showPinned, showUnpinned bool) ([]*core.Mod, error) {
