@@ -80,9 +80,9 @@ func TestGetSupportedMCVersions(t *testing.T) {
 
 func TestGetPackName(t *testing.T) {
 	cases := []struct {
-		name    string
-		pack    Pack
-		want    string
+		name string
+		pack Pack
+		want string
 	}{
 		{"empty name falls back to export", Pack{}, "export"},
 		{"name only", Pack{Name: "MyPack"}, "MyPack"},
@@ -97,6 +97,66 @@ func TestGetPackName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateExportFile(t *testing.T) {
+	pack := Pack{Name: "Example", Version: "1.2.3"}
+	root := t.TempDir()
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
+
+	assertOutput := func(t *testing.T, output, want string) {
+		t.Helper()
+		file, err := pack.CreateExportFile(output, ".zip")
+		if err != nil {
+			t.Fatalf("CreateExportFile(%q): %v", output, err)
+		}
+		got := file.Name()
+		if !filepath.IsAbs(got) {
+			got = filepath.Join(root, got)
+		}
+		if got = filepath.Clean(got); got != filepath.Clean(want) {
+			t.Errorf("CreateExportFile(%q) = %q, want %q", output, got, want)
+		}
+		if err := file.Close(); err != nil {
+			t.Errorf("close exported file: %v", err)
+		}
+	}
+
+	t.Run("default filename", func(t *testing.T) {
+		assertOutput(t, "", filepath.Join(root, "Example-1.2.3.zip"))
+	})
+	t.Run("new extensionless directory", func(t *testing.T) {
+		assertOutput(t, "new-output", filepath.Join(root, "new-output", "Example-1.2.3.zip"))
+	})
+	t.Run("existing directory with extension", func(t *testing.T) {
+		outputDir := filepath.Join(root, "release.v1")
+		if err := os.Mkdir(outputDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		assertOutput(t, outputDir, filepath.Join(outputDir, "Example-1.2.3.zip"))
+	})
+	t.Run("existing extensionless file remains a file", func(t *testing.T) {
+		output := filepath.Join(root, "custom-output")
+		if err := os.WriteFile(output, []byte("old"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		assertOutput(t, output, output)
+	})
+	t.Run("file parent directories are created", func(t *testing.T) {
+		output := filepath.Join(root, "nested", "custom.zip")
+		assertOutput(t, output, output)
+	})
 }
 
 func TestGetCompatibleLoaders(t *testing.T) {

@@ -224,11 +224,22 @@ func (pack Pack) GetLoaders() (loaders []string) {
 }
 
 func (pack Pack) CreateExportFile(fileName string, defaultFileExt string) (*os.File, error) {
-	// If fileName doesn't have an extension, treat it as a directory name.
-	if len(filepath.Ext(fileName)) <= 1 {
-		fileName = filepath.Join(fileName, pack.GetPackName()+defaultFileExt)
+	if fileName == "" {
+		fileName = pack.GetPackName() + defaultFileExt
+	} else {
+		isDirectory := len(filepath.Ext(fileName)) <= 1
+		if info, err := os.Stat(fileName); err == nil {
+			isDirectory = info.IsDir()
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+		if isDirectory {
+			fileName = filepath.Join(fileName, pack.GetPackName()+defaultFileExt)
+		}
 	}
 
-	os.MkdirAll(filepath.Dir(fileName), 0755)
+	if err := os.MkdirAll(filepath.Dir(fileName), 0o755); err != nil {
+		return nil, err
+	}
 	return os.Create(fileName)
 }
