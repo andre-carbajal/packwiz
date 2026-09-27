@@ -11,7 +11,7 @@ buildGoModule {
 
   src = ./..;
 
-  vendorHash = "sha256-ChUE4hWl+UyPpbzK0GbJTD0AoBCogI7qGstga4+WujI=";
+  vendorHash = "sha256-qvRlOxxvHffnsXy4MhbGIBGCDPtok/ymS/sUAJ5sGR0=";
 
   nativeBuildInputs = [
     installShellFiles
