@@ -1,17 +1,24 @@
 name: nix
-on: [push]
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   update-vendor-sha:
     name: vendor-sha
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
 
     - name: Checkout repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Install nix
-      uses: cachix/install-nix-action@v17
+      uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       with:
         extra_nix_config: |
           experimental-features = nix-command flakes
@@ -25,7 +32,7 @@ jobs:
         NIX_CONFIG: access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
     - name: Commit
-      uses: stefanzweifel/git-auto-commit-action@v4
+      uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
       with:
         commit_message: "chore: update packwiz vendorHash"
         branch: main
