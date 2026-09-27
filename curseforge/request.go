@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/andre-carbajal/packwiz/core"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/andre-carbajal/packwiz/core"
 )
 
 const cfApiServer = "api.curseforge.com"

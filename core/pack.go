@@ -28,9 +28,9 @@ type Pack struct {
 		HashFormat string `toml:"hash-format"`
 		Hash       string `toml:"hash,omitempty"`
 	} `toml:"index"`
-	Versions map[string]string                 `toml:"versions"`
-	Export   map[string]map[string]interface{} `toml:"export"`
-	Options  map[string]interface{}            `toml:"options"`
+	Versions map[string]string         `toml:"versions"`
+	Export   map[string]map[string]any `toml:"export"`
+	Options  map[string]any            `toml:"options"`
 }
 
 const CurrentPackFormat = "packwiz:1.1.0"

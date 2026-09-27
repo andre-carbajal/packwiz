@@ -63,7 +63,7 @@ var UpdateCmd = &cobra.Command{
 			fmt.Println("Checking for updates...")
 			updatesFound := false
 			updatableFiles := make(map[string][]*core.Mod)
-			updaterCachedStateMap := make(map[string][]interface{})
+			updaterCachedStateMap := make(map[string][]any)
 			for k, v := range filesWithUpdater {
 				checks, err := core.Updaters[k].CheckUpdate(v, pack)
 				if err != nil {
@@ -165,7 +165,7 @@ var UpdateCmd = &cobra.Command{
 				if check[0].UpdateAvailable {
 					fmt.Printf("Update available: %s\n", check[0].UpdateString)
 
-					err = updater.DoUpdate([]*core.Mod{&modData}, []interface{}{check[0].CachedState})
+					err = updater.DoUpdate([]*core.Mod{&modData}, []any{check[0].CachedState})
 					if err != nil {
 						fmt.Println(err)
 						os.Exit(1)

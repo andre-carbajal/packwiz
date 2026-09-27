@@ -3,9 +3,10 @@ package cmdshared
 import (
 	"bufio"
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 func PromptYesNo(prompt string) bool {

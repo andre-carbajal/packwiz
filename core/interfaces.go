@@ -9,13 +9,13 @@ var Updaters = make(map[string]Updater)
 type Updater interface {
 	// ParseUpdate takes an unparsed interface{} (as a map[string]interface{}), and returns an Updater for a mod file.
 	// This can be done using the mapstructure library or your own parsing methods.
-	ParseUpdate(map[string]interface{}) (interface{}, error)
+	ParseUpdate(map[string]any) (any, error)
 	// CheckUpdate checks whether there is an update for each of the mods in the given slice,
 	// called for all of the mods that this updater handles
 	CheckUpdate([]*Mod, Pack) ([]UpdateCheck, error)
 	// DoUpdate carries out the update previously queried in CheckUpdate, on each Mod's metadata,
 	// given pointers to Mods and the value of CachedState for each mod
-	DoUpdate([]*Mod, []interface{}) error
+	DoUpdate([]*Mod, []any) error
 }
 
 // UpdateCheck represents the data returned from CheckUpdate for each mod
@@ -26,7 +26,7 @@ type UpdateCheck struct {
 	// a version change (1.0.0 -> 1.0.1), or a file name change (thanos-skin-1.0.0.jar -> thanos-skin-1.0.1.jar).
 	UpdateString string
 	// CachedState can be used to preserve per-mod state between CheckUpdate and DoUpdate (e.g. file metadata)
-	CachedState interface{}
+	CachedState any
 	// Error stores an error for this specific mod
 	// Errors can also be returned from CheckUpdate directly, if the whole operation failed completely (so only 1 error is printed)
 	// If an error is returned for a mod, or from CheckUpdate, DoUpdate is not called on that mod / at all

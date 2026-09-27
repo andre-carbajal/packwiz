@@ -11,7 +11,10 @@ buildGoModule {
 
   src = ./..;
 
-  vendorHash = "sha256-qvRlOxxvHffnsXy4MhbGIBGCDPtok/ymS/sUAJ5sGR0=";
+  vendorHash = "sha256-WFddQ29ln2eMkNNybALlf3z4JPtXiLnqFBSE+uZJY68=";
+
+  # The requested toolchain equals the go directive; remove it only in Nix's build copy.
+  preBuild = "go mod edit -toolchain=none";
 
   nativeBuildInputs = [
     installShellFiles

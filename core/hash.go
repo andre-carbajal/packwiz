@@ -8,10 +8,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/andre-carbajal/packwiz/curseforge/murmur2"
 	"hash"
 	"strconv"
 	"strings"
+
+	"github.com/andre-carbajal/packwiz/curseforge/murmur2"
 )
 
 // GetHashImpl gets an implementation of hash.Hash for the given hash type string

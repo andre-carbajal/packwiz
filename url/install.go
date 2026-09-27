@@ -2,15 +2,16 @@ package url
 
 import (
 	"fmt"
-	"github.com/andre-carbajal/packwiz/core"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"io"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/andre-carbajal/packwiz/core"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var installCmd = &cobra.Command{

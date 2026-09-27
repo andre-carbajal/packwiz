@@ -15,7 +15,7 @@ import (
 // should never be called by these tests.
 type passthroughUpdater struct{}
 
-func (passthroughUpdater) ParseUpdate(in map[string]interface{}) (interface{}, error) {
+func (passthroughUpdater) ParseUpdate(in map[string]any) (any, error) {
 	return in, nil
 }
 
@@ -23,7 +23,7 @@ func (passthroughUpdater) CheckUpdate([]*Mod, Pack) ([]UpdateCheck, error) {
 	panic("passthroughUpdater.CheckUpdate should not be called in tests")
 }
 
-func (passthroughUpdater) DoUpdate([]*Mod, []interface{}) error {
+func (passthroughUpdater) DoUpdate([]*Mod, []any) error {
 	panic("passthroughUpdater.DoUpdate should not be called in tests")
 }
 
@@ -34,7 +34,6 @@ func (passthroughUpdater) DoUpdate([]*Mod, []interface{}) error {
 func registerTestUpdaters(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{"modrinth", "curseforge"} {
-		name := name
 		prev, existed := Updaters[name]
 		Updaters[name] = passthroughUpdater{}
 

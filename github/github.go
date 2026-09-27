@@ -5,9 +5,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/andre-carbajal/packwiz/cmd"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 )
 
@@ -70,8 +70,8 @@ type Asset struct {
 	Name               string `json:"name"`
 }
 
-func (u ghUpdateData) ToMap() (map[string]interface{}, error) {
-	newMap := make(map[string]interface{})
+func (u ghUpdateData) ToMap() (map[string]any, error) {
+	newMap := make(map[string]any)
 	err := mapstructure.Decode(u, &newMap)
 	return newMap, err
 }

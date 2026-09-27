@@ -183,9 +183,7 @@ var initCmd = &cobra.Command{
 				"minecraft": mcVersion,
 			},
 		}
-		for k, v := range modLoaderVersions {
-			pack.Versions[k] = v
-		}
+		maps.Copy(pack.Versions, modLoaderVersions)
 
 		// Refresh the index and pack
 		index, err := pack.LoadIndex()

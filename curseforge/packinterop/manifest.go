@@ -91,9 +91,9 @@ func (c cursePackMeta) GetFiles() ([]ImportPackFile, error) {
 		}
 		// Wrap files, removing overrides/ from the start
 		for _, v := range fullList {
-			if strings.HasPrefix(v.Name(), overridesPath) {
+			if after, ok := strings.CutPrefix(v.Name(), overridesPath); ok {
 				overridesList = append(overridesList, cursePackOverrideWrapper{
-					name:           strings.TrimPrefix(v.Name(), overridesPath),
+					name:           after,
 					ImportPackFile: v,
 				})
 			}

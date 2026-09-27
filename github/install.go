@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/dlclark/regexp2"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/dlclark/regexp2/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -126,7 +126,7 @@ func getLatestRelease(slug string, branch string) (Release, error) {
 }
 
 func installRelease(repo Repo, release Release, regex string, pack core.Pack) error {
-	expr := regexp2.MustCompile(regex, 0)
+	expr := regexp2.MustCompile(regex)
 
 	if len(release.Assets) == 0 {
 		return errors.New("release doesn't have any assets attached")
@@ -159,7 +159,7 @@ func installRelease(repo Repo, release Release, regex string, pack core.Pack) er
 		return err
 	}
 
-	updateMap := make(map[string]map[string]interface{})
+	updateMap := make(map[string]map[string]any)
 
 	updateMap["github"], err = ghUpdateData{
 		Slug:   repo.FullName,

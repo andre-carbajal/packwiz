@@ -20,8 +20,8 @@ type Mod struct {
 	Pin      bool        `toml:"pin,omitempty"`
 	Download ModDownload `toml:"download"`
 	// Update is a map of map of stuff, so you can store arbitrary values on string keys to define updating
-	Update     map[string]map[string]interface{} `toml:"update"`
-	updateData map[string]interface{}
+	Update     map[string]map[string]any `toml:"update"`
+	updateData map[string]any
 
 	Option *ModOption `toml:"option,omitempty"`
 }
@@ -61,7 +61,7 @@ func LoadMod(modFile string) (Mod, error) {
 	if _, err := toml.DecodeFile(modFile, &mod); err != nil {
 		return Mod{}, err
 	}
-	mod.updateData = make(map[string]interface{})
+	mod.updateData = make(map[string]any)
 	// Horrible reflection library to convert map[string]interface to proper struct
 	for k, v := range mod.Update {
 		updater, ok := Updaters[k]
@@ -119,7 +119,7 @@ func (m Mod) Write() (string, string, error) {
 }
 
 // GetParsedUpdateData can be used to retrieve updater-specific information after parsing a mod file
-func (m Mod) GetParsedUpdateData(updaterName string) (interface{}, bool) {
+func (m Mod) GetParsedUpdateData(updaterName string) (any, bool) {
 	upd, ok := m.updateData[updaterName]
 	return upd, ok
 }

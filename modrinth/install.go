@@ -398,7 +398,7 @@ func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, 
 }
 
 func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, file *modrinthApi.File, pack core.Pack, index *core.Index) error {
-	updateMap := make(map[string]map[string]interface{})
+	updateMap := make(map[string]map[string]any)
 
 	var err error
 	updateMap["modrinth"], err = mrUpdateData{

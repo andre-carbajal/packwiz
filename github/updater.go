@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dlclark/regexp2"
-	"github.com/mitchellh/mapstructure"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/dlclark/regexp2/v2"
+	"github.com/mitchellh/mapstructure"
 )
 
 type ghUpdateData struct {
@@ -19,7 +19,7 @@ type ghUpdateData struct {
 
 type ghUpdater struct{}
 
-func (u ghUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface{}, error) {
+func (u ghUpdater) ParseUpdate(updateUnparsed map[string]any) (any, error) {
 	var updateData ghUpdateData
 	err := mapstructure.Decode(updateUnparsed, &updateData)
 	return updateData, err
@@ -53,7 +53,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 			continue
 		}
 
-		expr := regexp2.MustCompile(data.Regex, 0)
+		expr := regexp2.MustCompile(data.Regex)
 
 		if len(newRelease.Assets) == 0 {
 			results[i] = core.UpdateCheck{Error: errors.New("new release doesn't have any assets")}
@@ -92,7 +92,7 @@ func (u ghUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	return results, nil
 }
 
-func (u ghUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
+func (u ghUpdater) DoUpdate(mods []*core.Mod, cachedState []any) error {
 	for i, mod := range mods {
 		modState := cachedState[i].(cachedStateStore)
 		var release = modState.Release

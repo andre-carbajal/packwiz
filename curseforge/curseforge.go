@@ -13,9 +13,9 @@ import (
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/andre-carbajal/packwiz/cmd"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 )
 
@@ -37,9 +37,9 @@ var snapshotNames = [...]string{"-pre", " Pre-Release ", " Pre-release ", "-rc"}
 
 func getCurseforgeVersion(mcVersion string) string {
 	for _, name := range snapshotNames {
-		index := strings.Index(mcVersion, name)
-		if index > -1 {
-			return mcVersion[:index] + "-Snapshot"
+		before, _, ok := strings.Cut(mcVersion, name)
+		if ok {
+			return before + "-Snapshot"
 		}
 	}
 
@@ -177,7 +177,7 @@ func getPathForFile(gameID uint32, classID uint32, categoryID uint32, slug strin
 }
 
 func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, optionalDisabled bool) error {
-	updateMap := make(map[string]map[string]interface{})
+	updateMap := make(map[string]map[string]any)
 	var err error
 
 	updateMap["curseforge"], err = cfUpdateData{
@@ -362,15 +362,15 @@ type cfUpdateData struct {
 	FileID    uint32 `mapstructure:"file-id"`
 }
 
-func (u cfUpdateData) ToMap() (map[string]interface{}, error) {
-	newMap := make(map[string]interface{})
+func (u cfUpdateData) ToMap() (map[string]any, error) {
+	newMap := make(map[string]any)
 	err := mapstructure.Decode(u, &newMap)
 	return newMap, err
 }
 
 type cfUpdater struct{}
 
-func (u cfUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface{}, error) {
+func (u cfUpdater) ParseUpdate(updateUnparsed map[string]any) (any, error) {
 	var updateData cfUpdateData
 	err := mapstructure.Decode(updateUnparsed, &updateData)
 	return updateData, err
@@ -442,7 +442,7 @@ func (u cfUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	return results, nil
 }
 
-func (u cfUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
+func (u cfUpdater) DoUpdate(mods []*core.Mod, cachedState []any) error {
 	// "Do" isn't really that accurate, more like "Apply", because all the work is done in CheckUpdate!
 	for i, v := range mods {
 		modState := cachedState[i].(cachedStateStore)
@@ -478,13 +478,13 @@ type cfExportData struct {
 	ProjectID uint32 `mapstructure:"project-id"`
 }
 
-func (e cfExportData) ToMap() (map[string]interface{}, error) {
-	newMap := make(map[string]interface{})
+func (e cfExportData) ToMap() (map[string]any, error) {
+	newMap := make(map[string]any)
 	err := mapstructure.Decode(e, &newMap)
 	return newMap, err
 }
 
-func parseExportData(from map[string]interface{}) (cfExportData, error) {
+func parseExportData(from map[string]any) (cfExportData, error) {
 	var exportData cfExportData
 	err := mapstructure.Decode(from, &exportData)
 	return exportData, err

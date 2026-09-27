@@ -93,10 +93,10 @@ func TestGetHashImpl(t *testing.T) {
 
 func TestHashToString(t *testing.T) {
 	cases := []struct {
-		name      string
-		hashType  string
-		input     []byte
-		want      string
+		name     string
+		hashType string
+		input    []byte
+		want     string
 	}{
 		{
 			name:     "hexStringer encodes bytes as lowercase hex",

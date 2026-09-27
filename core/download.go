@@ -690,8 +690,8 @@ func CreateDownloadSession(mods []*Mod, hashesToObtain []string) (DownloadSessio
 				hashFormat: mod.Download.HashFormat,
 				hash:       mod.Download.Hash,
 			})
-		} else if strings.HasPrefix(mod.Download.Mode, "metadata:") {
-			dlID := strings.TrimPrefix(mod.Download.Mode, "metadata:")
+		} else if after, ok := strings.CutPrefix(mod.Download.Mode, "metadata:"); ok {
+			dlID := after
 			pendingMetadata[dlID] = append(pendingMetadata[dlID], mod)
 		} else {
 			return nil, fmt.Errorf("unknown download mode %s for %s", mod.Download.Mode, mod.Name)

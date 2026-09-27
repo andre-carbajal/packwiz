@@ -59,7 +59,7 @@ func TestModPathAccessors(t *testing.T) {
 
 func TestGetParsedUpdateData(t *testing.T) {
 	m := Mod{
-		updateData: map[string]interface{}{
+		updateData: map[string]any{
 			"curseforge": map[string]int{"file-id": 12345},
 		},
 	}

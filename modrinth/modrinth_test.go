@@ -14,7 +14,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-func sptr(s string) *string { return &s }
+//go:fix inline
+func sptr(s string) *string { return new(s) }
 
 // newTestModrinthMod writes a Mod TOML to a temp file and loads it
 // through core.LoadMod, which exercises the modrinth init() updater
@@ -57,14 +58,14 @@ func TestGetSide(t *testing.T) {
 		environment *string
 		want        string
 	}{
-		{"client only", sptr("client_only"), core.ClientSide},
-		{"server only also works in singleplayer", sptr("server_only"), core.UniversalSide},
-		{"dedicated server only", sptr("dedicated_server_only"), core.ServerSide},
-		{"client and server", sptr("client_and_server"), core.UniversalSide},
-		{"client or server", sptr("client_or_server"), "either"},
-		{"singleplayer only", sptr("singleplayer_only"), core.ClientSide},
+		{"client only", new("client_only"), core.ClientSide},
+		{"server only also works in singleplayer", new("server_only"), core.UniversalSide},
+		{"dedicated server only", new("dedicated_server_only"), core.ServerSide},
+		{"client and server", new("client_and_server"), core.UniversalSide},
+		{"client or server", new("client_or_server"), "either"},
+		{"singleplayer only", new("singleplayer_only"), core.ClientSide},
 		{"missing environment", nil, ""},
-		{"unknown environment", sptr("unknown-value"), ""},
+		{"unknown environment", new("unknown-value"), ""},
 	}
 
 	for _, tc := range cases {
@@ -533,7 +534,9 @@ func TestFindLatestVersion_IgnoresLoadersNotSupportedByPack(t *testing.T) {
 
 // projectIDPtr / versionPtr / boolPtr just keep the resolveVersion
 // and getLatestVersion test fixtures readable.
-func strPtr(s string) *string { return &s }
+//
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
 func TestResolveVersion_VersionIDInProjectVersionList(t *testing.T) {
 	// When the requested version string is present in project.Versions,
@@ -762,7 +765,7 @@ func TestMrUpdateData_ToMap_RoundTrip(t *testing.T) {
 }
 
 func TestMrUpdater_ParseUpdate(t *testing.T) {
-	in := map[string]interface{}{
+	in := map[string]any{
 		"mod-id":  "AANobbMI",
 		"version": "gqoXgtxO",
 	}

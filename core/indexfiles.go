@@ -147,7 +147,6 @@ func (rep indexFilesTomlRepresentation) toMemoryRep() IndexFiles {
 
 	// Add entries to map
 	for _, v := range rep {
-		v := v // Narrow scope of loop variable
 		v.File = path.Clean(v.File)
 		v.Alias = path.Clean(v.Alias)
 		// path.Clean converts "" into "." - undo this for Alias as we use omitempty

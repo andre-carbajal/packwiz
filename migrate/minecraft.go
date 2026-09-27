@@ -2,12 +2,13 @@ package migrate
 
 import (
 	"fmt"
+	"os"
+
 	packCmd "github.com/andre-carbajal/packwiz/cmd"
 	"github.com/andre-carbajal/packwiz/cmdshared"
 	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
 )
 
 var minecraftCommand = &cobra.Command{

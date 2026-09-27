@@ -35,13 +35,19 @@
         system:
         let
           pkgs = nixpkgsFor.${system};
+          go_1_26_8 = pkgs.go_1_26.overrideAttrs (_: {
+            version = "1.26.8";
+            src = pkgs.fetchurl {
+              url = "https://go.dev/dl/go1.26.8.src.tar.gz";
+              hash = "sha256-Tjm5jkL5RvoFrIvFtxh335fb23y7Gnd7VBZnrXEX/S4=";
+            };
+          });
+          buildGoModule = pkgs.buildGoModule.override { go = go_1_26_8; };
         in
         rec {
           packwiz = pkgs.callPackage ./nix {
             version = substring 0 8 self.rev or "dirty";
-            buildGoModule = pkgs.buildGoModule;
-            # As of writing, `pkgs.buildGoModule` is aliased to
-            # `pkgs.buildGo121Module` in Nixpkgs.
+            inherit buildGoModule;
           };
           # Build packwiz by default when no package name is specified
           default = packwiz;

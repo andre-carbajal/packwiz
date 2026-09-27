@@ -3,11 +3,12 @@ package cmdshared
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/andre-carbajal/packwiz/core"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/andre-carbajal/packwiz/core"
 )
 
 func ListManualDownloads(session core.DownloadSession) {

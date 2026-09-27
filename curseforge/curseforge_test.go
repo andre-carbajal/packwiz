@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/jarcoal/httpmock"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/jarcoal/httpmock"
 	"github.com/spf13/viper"
 )
 
@@ -412,7 +412,7 @@ func TestParseExportData(t *testing.T) {
 	})
 
 	t.Run("missing project-id yields zero value", func(t *testing.T) {
-		got, err := parseExportData(map[string]interface{}{})
+		got, err := parseExportData(map[string]any{})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -454,7 +454,7 @@ func TestCfUpdateData_ToMap_RoundTrip(t *testing.T) {
 }
 
 func TestCfUpdater_ParseUpdate(t *testing.T) {
-	in := map[string]interface{}{
+	in := map[string]any{
 		"project-id": uint32(306612),
 		"file-id":    uint32(4567890),
 	}

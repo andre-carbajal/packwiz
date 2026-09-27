@@ -6,12 +6,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/andre-carbajal/packwiz/curseforge/packinterop"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+
+	"github.com/andre-carbajal/packwiz/curseforge/packinterop"
 
 	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/cobra"
@@ -289,13 +291,7 @@ var importCmd = &cobra.Command{
 			filePath := index.ResolveIndexPath(v.Name())
 			filePathAbs, err := filepath.Abs(filePath)
 			if err == nil {
-				found := false
-				for _, v := range referencedModPaths {
-					if v == filePathAbs {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(referencedModPaths, filePathAbs)
 				if found {
 					fmt.Printf("Ignored file \"%s\" (referenced by metadata)\n", filePath)
 					successes++

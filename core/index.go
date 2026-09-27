@@ -13,8 +13,8 @@ import (
 	"github.com/BurntSushi/toml"
 	gitignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/viper"
-	"github.com/vbauerster/mpb/v4"
-	"github.com/vbauerster/mpb/v4/decor"
+	"github.com/vbauerster/mpb/v5"
+	"github.com/vbauerster/mpb/v5/decor"
 )
 
 // Index is a representation of the index.toml file for referencing all the files in a pack.
@@ -242,7 +242,8 @@ func (in *Index) Refresh() error {
 			return err
 		}
 
-		progress.Increment(time.Since(start))
+		progress.Increment()
+		progress.DecoratorEwmaUpdate(time.Since(start))
 	}
 	// Close bar
 	progress.SetTotal(int64(len(fileList)), true) // If len = 0, we have to manually set complete to true

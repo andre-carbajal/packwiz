@@ -27,7 +27,7 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 	}
 
 	// Determine what format the file is
-	var jsonFile map[string]interface{}
+	var jsonFile map[string]any
 	err = json.Unmarshal(fileData, &jsonFile)
 	if err != nil {
 		fmt.Printf("Error parsing JSON: %s\n", err)

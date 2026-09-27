@@ -2,8 +2,9 @@ package murmur2
 
 import (
 	"encoding/binary"
-	"github.com/aviddiviner/go-murmur"
 	"hash"
+
+	"github.com/aviddiviner/go-murmur"
 )
 
 func New() hash.Hash32 {

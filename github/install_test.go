@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jarcoal/httpmock"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/jarcoal/httpmock"
 )
 
 // newTestGithubMod writes a Mod TOML referencing the github update

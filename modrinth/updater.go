@@ -19,15 +19,15 @@ type mrUpdateData struct {
 	InstalledVersion string `mapstructure:"version"`
 }
 
-func (u mrUpdateData) ToMap() (map[string]interface{}, error) {
-	newMap := make(map[string]interface{})
+func (u mrUpdateData) ToMap() (map[string]any, error) {
+	newMap := make(map[string]any)
 	err := mapstructure.Decode(u, &newMap)
 	return newMap, err
 }
 
 type mrUpdater struct{}
 
-func (u mrUpdater) ParseUpdate(updateUnparsed map[string]interface{}) (interface{}, error) {
+func (u mrUpdater) ParseUpdate(updateUnparsed map[string]any) (any, error) {
 	var updateData mrUpdateData
 	err := mapstructure.Decode(updateUnparsed, &updateData)
 	return updateData, err
@@ -102,7 +102,7 @@ func (u mrUpdater) CheckUpdate(mods []*core.Mod, pack core.Pack) ([]core.UpdateC
 	return results, nil
 }
 
-func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []interface{}) error {
+func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []any) error {
 	for i, mod := range mods {
 		modState := cachedState[i].(cachedStateStore)
 		var version = modState.Version

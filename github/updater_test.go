@@ -3,7 +3,7 @@ package github
 import "testing"
 
 func TestGhUpdater_ParseUpdate(t *testing.T) {
-	in := map[string]interface{}{
+	in := map[string]any{
 		"slug":   "packwiz/packwiz",
 		"tag":    "v1.0.0",
 		"branch": "main",
@@ -32,7 +32,7 @@ func TestGhUpdater_ParseUpdate_MissingFieldsAreZero(t *testing.T) {
 	// defaulting to zero values — that's mapstructure's standard
 	// behavior. Pinning so a future migration to a stricter decoder
 	// (DisallowUnknownFields, ErrorUnused, etc.) surfaces here.
-	in := map[string]interface{}{
+	in := map[string]any{
 		"slug": "packwiz/packwiz",
 	}
 

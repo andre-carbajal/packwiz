@@ -32,12 +32,12 @@ var acceptableVersionsCommand = &cobra.Command{
 		// Check if they have no options whatsoever
 		if modpack.Options == nil {
 			// Initialize the options
-			modpack.Options = make(map[string]interface{})
+			modpack.Options = make(map[string]any)
 		}
 		// Check if the acceptable-game-versions is nil, which would mean their pack.toml doesn't have it set yet
 		if modpack.Options["acceptable-game-versions"] != nil {
 			// Convert the interface{} to a string slice
-			for _, v := range modpack.Options["acceptable-game-versions"].([]interface{}) {
+			for _, v := range modpack.Options["acceptable-game-versions"].([]any) {
 				currentVersions = append(currentVersions, v.(string))
 			}
 		}
