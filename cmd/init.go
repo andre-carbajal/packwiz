@@ -9,10 +9,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/fatih/camelcase"
-	"github.com/igorsobreira/titlecase"
 	"github.com/andre-carbajal/packwiz/cmdshared"
 	"github.com/andre-carbajal/packwiz/core"
+	"github.com/fatih/camelcase"
+	"github.com/igorsobreira/titlecase"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -23,6 +23,7 @@ var initCmd = &cobra.Command{
 	Short: "Initialise a packwiz modpack",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		var existingPack *core.Pack
 		_, err := os.Stat(viper.GetString("pack-file"))
 		if err == nil && !viper.GetBool("init.reinit") {
 			fmt.Println("Modpack metadata file already exists, use -r to override!")
@@ -31,8 +32,19 @@ var initCmd = &cobra.Command{
 			fmt.Printf("Error checking pack file: %s\n", err)
 			os.Exit(1)
 		}
+		if err == nil && viper.GetBool("init.reinit") {
+			pack, err := core.LoadPack()
+			if err != nil {
+				fmt.Printf("Error loading existing pack data: %s\n", err)
+				os.Exit(1)
+			}
+			existingPack = &pack
+		}
 
 		name, err := cmd.Flags().GetString("name")
+		if len(name) == 0 && existingPack != nil && !cmd.Flags().Changed("name") {
+			name = existingPack.Name
+		}
 		if err != nil || len(name) == 0 {
 			// Get current file directory name
 			wd, err := os.Getwd()
@@ -50,11 +62,17 @@ var initCmd = &cobra.Command{
 		}
 
 		author, err := cmd.Flags().GetString("author")
+		if len(author) == 0 && existingPack != nil && !cmd.Flags().Changed("author") {
+			author = existingPack.Author
+		}
 		if err != nil || len(author) == 0 {
 			author = initReadValue("Author: ", "")
 		}
 
 		version, err := cmd.Flags().GetString("version")
+		if len(version) == 0 && existingPack != nil && !cmd.Flags().Changed("version") {
+			version = existingPack.Version
+		}
 		if err != nil || len(version) == 0 {
 			version = initReadValue("Version [1.0.0]: ", "1.0.0")
 		}
@@ -66,6 +84,9 @@ var initCmd = &cobra.Command{
 		}
 
 		mcVersion := viper.GetString("init.mc-version")
+		if len(mcVersion) == 0 && existingPack != nil && !viper.GetBool("init.latest") && !cmd.Flags().Changed("mc-version") {
+			mcVersion = existingPack.Versions["minecraft"]
+		}
 		if len(mcVersion) == 0 {
 			var latestVersion string
 			if viper.GetBool("init.snapshot") {
@@ -82,12 +103,16 @@ var initCmd = &cobra.Command{
 		mcVersions.CheckValid(mcVersion)
 
 		modLoaderName := strings.ToLower(viper.GetString("init.modloader"))
+		modLoaderVersions := make(map[string]string)
+		preserveExistingVersions := existingPack != nil && len(modLoaderName) == 0 && !cmd.Flags().Changed("modloader")
+		if preserveExistingVersions {
+			modLoaderName, modLoaderVersions = existingPackLoaderDefaults(*existingPack)
+		}
 		if len(modLoaderName) == 0 {
 			modLoaderName = strings.ToLower(initReadValue("Mod loader [quilt]: ", "quilt"))
 		}
 
 		loader, ok := core.ModLoaders[modLoaderName]
-		modLoaderVersions := make(map[string]string)
 		if modLoaderName != "none" {
 			if ok {
 				versionData, err := core.DoQuery(core.MakeQuery(loader, mcVersion))
@@ -96,6 +121,9 @@ var initCmd = &cobra.Command{
 					os.Exit(1)
 				}
 				componentVersion := viper.GetString("init." + loader.Name + "-version")
+				if len(componentVersion) == 0 && existingPack != nil && !cmd.Flags().Changed(loader.Name+"-version") && !viper.GetBool("init."+loader.Name+"-latest") {
+					componentVersion = existingPack.Versions[loader.Name]
+				}
 				if len(componentVersion) == 0 {
 					if viper.GetBool("init." + loader.Name + "-latest") {
 						componentVersion = versionData.Latest
@@ -155,10 +183,8 @@ var initCmd = &cobra.Command{
 				"minecraft": mcVersion,
 			},
 		}
-		if modLoaderName != "none" {
-			for k, v := range modLoaderVersions {
-				pack.Versions[k] = v
-			}
+		for k, v := range modLoaderVersions {
+			pack.Versions[k] = v
 		}
 
 		// Refresh the index and pack
@@ -191,6 +217,24 @@ var initCmd = &cobra.Command{
 	},
 }
 
+func existingPackLoaderDefaults(pack core.Pack) (string, map[string]string) {
+	versions := make(map[string]string, len(pack.Versions))
+	for name, version := range pack.Versions {
+		if name != "minecraft" {
+			versions[name] = version
+		}
+	}
+
+	loaderNames := slices.Collect(maps.Keys(core.ModLoaders))
+	slices.Sort(loaderNames)
+	for _, name := range loaderNames {
+		if _, ok := versions[name]; ok {
+			return name, versions
+		}
+	}
+	return "none", versions
+}
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 
@@ -205,7 +249,7 @@ func init() {
 	_ = viper.BindPFlag("init.latest", initCmd.Flags().Lookup("latest"))
 	initCmd.Flags().BoolP("snapshot", "s", false, "Use the latest snapshot version with --latest")
 	_ = viper.BindPFlag("init.snapshot", initCmd.Flags().Lookup("snapshot"))
-	initCmd.Flags().BoolP("reinit", "r", false, "Recreate the pack file if it already exists, rather than exiting")
+	initCmd.Flags().BoolP("reinit", "r", false, "Recreate the pack file using existing values as defaults")
 	_ = viper.BindPFlag("init.reinit", initCmd.Flags().Lookup("reinit"))
 	initCmd.Flags().String("modloader", "", "The mod loader to use (omit to define interactively)")
 	_ = viper.BindPFlag("init.modloader", initCmd.Flags().Lookup("modloader"))
