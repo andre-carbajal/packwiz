@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/packwiz/packwiz/cmdshared"
+	"github.com/andre-carbajal/packwiz/cmdshared"
 
 	"slices"
 
-	"github.com/packwiz/packwiz/core"
+	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/cobra"
 )
 

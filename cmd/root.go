@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/packwiz/packwiz/core"
-	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/andre-carbajal/packwiz/core"
+	"github.com/spf13/pflag"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

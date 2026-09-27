@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/packwiz/packwiz/cmd"
-	"github.com/packwiz/packwiz/core"
+	"github.com/andre-carbajal/packwiz/cmd"
+	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/cobra"
 )
 

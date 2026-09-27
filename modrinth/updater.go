@@ -7,7 +7,7 @@ import (
 	modrinthApi "codeberg.org/theepicblock/go-modrinth/modrinth"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/packwiz/packwiz/core"
+	"github.com/andre-carbajal/packwiz/core"
 )
 
 type mrUpdateData struct {

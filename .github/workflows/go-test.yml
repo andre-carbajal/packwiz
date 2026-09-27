@@ -19,7 +19,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
     
-    # Our goal: test if `go install github.com/packwiz/packwiz@latest` still works. Since a
+    # Our goal: test if `go install github.com/andre-carbajal/packwiz@latest` still works. Since a
     # decent amount of people install packwiz in this manner. `go install` has some differences
     # in behaviour when using modules with version suffixes. For example, the "redirect" keyword is
     # forbidden in this mode. This does not happen when running `go install .`, so we must emulate
@@ -31,25 +31,25 @@ jobs:
 
     - name: Set up a fake goproxy folder
       run: |
-        mkdir -p /tmp/fakegoproxy/github.com/packwiz/packwiz/@v/
-        echo '{"Version":"v1.99.99","Time":"2000-01-01T00:00:00Z"}' > /tmp/fakegoproxy/github.com/packwiz/packwiz/@v/v1.99.99.info
-        echo 'v1.99.99' > /tmp/fakegoproxy/github.com/packwiz/packwiz/@v/list
-        cp ./go.mod /tmp/fakegoproxy/github.com/packwiz/packwiz/@v/v1.99.99.mod
-        rm -rf $(go env GOMODCACHE)/cache/download/github.com/packwiz # Ensure that we don't accidentally use any cached versions
+        mkdir -p /tmp/fakegoproxy/github.com/andre-carbajal/packwiz/@v/
+        echo '{"Version":"v1.99.99","Time":"2000-01-01T00:00:00Z"}' > /tmp/fakegoproxy/github.com/andre-carbajal/packwiz/@v/v1.99.99.info
+        echo 'v1.99.99' > /tmp/fakegoproxy/github.com/andre-carbajal/packwiz/@v/list
+        cp ./go.mod /tmp/fakegoproxy/github.com/andre-carbajal/packwiz/@v/v1.99.99.mod
+        rm -rf $(go env GOMODCACHE)/cache/download/github.com/andre-carbajal # Ensure that we don't accidentally use any cached versions
         # The following python scripts zips a folder whilst adding the correct prefix to it:
         python -c "$(cat <<'EOF'
         import os;
         import zipfile;
-        with zipfile.ZipFile("/tmp/fakegoproxy/github.com/packwiz/packwiz/@v/v1.99.99.zip", "w") as zf:
+        with zipfile.ZipFile("/tmp/fakegoproxy/github.com/andre-carbajal/packwiz/@v/v1.99.99.zip", "w") as zf:
           for root, dirs, files in os.walk("."):
             for file in files:
-              zf.write(os.path.join(root, file), os.path.join("github.com/packwiz/packwiz@v1.99.99/",root,file))
+              zf.write(os.path.join(root, file), os.path.join("github.com/andre-carbajal/packwiz@v1.99.99/",root,file))
         EOF
         )"
-        rm -rf $(go env GOMODCACHE)/cache/download/github.com/packwiz # Ensure that this version doesn't end up being cached
+        rm -rf $(go env GOMODCACHE)/cache/download/github.com/andre-carbajal # Ensure that this version doesn't end up being cached
 
     - name: Attempt to install packwiz
-      run: GOPROXY="file:///tmp/fakegoproxy/,$(go env GOPROXY)" GOSUMDB='off' go install github.com/packwiz/packwiz@v1.99.99
+      run: GOPROXY="file:///tmp/fakegoproxy/,$(go env GOPROXY)" GOSUMDB='off' go install github.com/andre-carbajal/packwiz@v1.99.99
   
   run-tests:
     name: Run go tests

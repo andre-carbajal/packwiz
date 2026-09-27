@@ -24,16 +24,16 @@ Join my Discord server if you need help [here](https://discord.gg/Csh8zbbhCt)!
 - Creation of remote file metadata from JAR files for CurseForge mods
 
 ## Installation
-Prebuilt binaries are available from [GitHub Actions](https://github.com/packwiz/packwiz/actions) - the UI is a bit terrible, but essentially select the top build, then download the artifact ZIP for your system at the bottom of the page.  
+Stable prebuilt binaries are available from [GitHub Releases](https://github.com/andre-carbajal/packwiz/releases/latest).
 
-Another option is to use [nightly.link](https://nightly.link/packwiz/packwiz/workflows/go/main). Just go to the page, and download the artifact for your system.  
+Development snapshots are available from [nightly.link](https://nightly.link/andre-carbajal/packwiz/workflows/go/main).
 
 To run the executable, first extract it, then add the folder where you extracted it to your PATH environment variable ([see tutorial for Windows here](https://www.howtogeek.com/118594/how-to-edit-your-system-path-for-easy-command-line-access/)) or move it to where you want to use it.
 
-In future I will have a lot more installation options, but you can also compile from source:
+You can also install the latest version from source with Go:
 
 1. Install Go (1.24 or newer) from https://golang.org/dl/
-2. Run `go install github.com/packwiz/packwiz@latest`. Be patient, it has to download and compile dependencies as well!
+2. Run `go install github.com/andre-carbajal/packwiz@latest`. Be patient, it has to download and compile dependencies as well!
 
 ## Documentation
 See https://packwiz.infra.link/ for the full packwiz documentation!

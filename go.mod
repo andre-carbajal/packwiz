@@ -1,4 +1,8 @@
-module github.com/packwiz/packwiz
+module github.com/andre-carbajal/packwiz
+
+go 1.23.0
+
+toolchain go1.24.6
 
 require (
 	github.com/BurntSushi/toml v1.5.0
@@ -53,7 +57,3 @@ require (
 	go.uber.org/multierr v1.9.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-go 1.23.0
-
-toolchain go1.24.6

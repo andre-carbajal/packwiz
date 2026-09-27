@@ -5,8 +5,8 @@ import (
 	"os"
 	"slices"
 
-	"github.com/packwiz/packwiz/cmdshared"
-	"github.com/packwiz/packwiz/core"
+	"github.com/andre-carbajal/packwiz/cmdshared"
+	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/cobra"
 )
 

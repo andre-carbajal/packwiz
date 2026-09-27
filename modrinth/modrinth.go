@@ -10,8 +10,8 @@ import (
 	"slices"
 
 	modrinthApi "codeberg.org/theepicblock/go-modrinth/modrinth"
-	"github.com/packwiz/packwiz/cmd"
-	"github.com/packwiz/packwiz/core"
+	"github.com/andre-carbajal/packwiz/cmd"
+	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/unascribed/FlexVer/go/flexver"
