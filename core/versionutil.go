@@ -237,7 +237,7 @@ func fetchLiteloaderStyle(q VersionListQuery, url string) (*ModLoaderVersions, e
 // When `filterMap` returns a string, the version will be renamed to the provided string. If `nil` is returned, the
 // version is marked as invalid and will not be considered in the result.
 func fetchMavenWithFilterMap(q VersionListQuery, url string, filterMap func(version string) *string) (*ModLoaderVersions, error) {
-	res, err := GetWithUA(url, "application/xml")
+	res, err := GetAPIWithUA(url, "application/xml")
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ type ForgeRecommended struct {
 
 // getForgeRecommended gets the recommended version of Forge for the given Minecraft version
 func getForgeRecommended(q VersionListQuery) string {
-	res, err := GetWithUA("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json", "application/json")
+	res, err := GetAPIWithUA("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json", "application/json")
 	if err != nil {
 		return ""
 	}

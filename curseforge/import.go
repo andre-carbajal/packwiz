@@ -25,15 +25,14 @@ var importCmd = &cobra.Command{
 	Use:   "import [modpack path]",
 	Short: "Import a curseforge modpack from a downloaded pack zip or an installed metadata json file",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		inputFile := args[0]
 		var packImport packinterop.ImportPackMetadata
 
 		// TODO: refactor/extract file checking?
 		if strings.HasPrefix(inputFile, "http") {
 			// TODO: implement
-			fmt.Println("HTTP not supported (yet)")
-			os.Exit(1)
+			return errors.New("HTTP import is not supported yet")
 		} else {
 			// Attempt to read from file
 			var f *os.File
@@ -73,8 +72,7 @@ var importCmd = &cobra.Command{
 				if found {
 					f, err = os.Open(inputFile)
 					if err != nil {
-						fmt.Printf("Error opening file: %s\n", err)
-						os.Exit(1)
+						return fmt.Errorf("error opening file: %w", err)
 					}
 				} else {
 					fmt.Printf("Error opening file: %s\n", err)
@@ -83,7 +81,7 @@ var importCmd = &cobra.Command{
 					if errCurse != nil {
 						fmt.Printf("Also attempted to load a Curse/Twitch modpack named \"%s\": %s\n", inputFile, errCurse)
 					}
-					os.Exit(1)
+					return fmt.Errorf("error opening file %q: %w", inputFile, err)
 				}
 			}
 			defer f.Close()
@@ -91,8 +89,7 @@ var importCmd = &cobra.Command{
 			buf := bufio.NewReader(f)
 			header, err := buf.Peek(2)
 			if err != nil {
-				fmt.Printf("Error reading file: %s\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error reading file: %w", err)
 			}
 
 			// Check if file is a zip
@@ -100,19 +97,16 @@ var importCmd = &cobra.Command{
 				// Read the whole file (as bufio doesn't work for zips)
 				zipData, err := io.ReadAll(buf)
 				if err != nil {
-					fmt.Printf("Error reading file: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error reading file: %w", err)
 				}
 				// Get zip size
 				stat, err := f.Stat()
 				if err != nil {
-					fmt.Printf("Error reading file: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error reading file metadata: %w", err)
 				}
 				zr, err := zip.NewReader(bytes.NewReader(zipData), stat.Size())
 				if err != nil {
-					fmt.Printf("Error parsing zip: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error parsing zip: %w", err)
 				}
 
 				// Search the zip for minecraftinstance.json or manifest.json
@@ -124,13 +118,15 @@ var importCmd = &cobra.Command{
 				}
 
 				if metaFile == nil {
-					fmt.Println("Can't find manifest.json or minecraftinstance.json, is this a valid pack?")
-					os.Exit(1)
+					return errors.New("can't find manifest.json or minecraftinstance.json; is this a valid pack?")
 				}
 
-				packImport = packinterop.ReadMetadata(packinterop.GetZipPackSource(metaFile, zr))
+				packImport, err = packinterop.ReadMetadata(packinterop.GetZipPackSource(metaFile, zr))
 			} else {
-				packImport = packinterop.ReadMetadata(packinterop.GetDiskPackSource(buf, filepath.ToSlash(filepath.Base(inputFile)), filepath.Dir(inputFile)))
+				packImport, err = packinterop.ReadMetadata(packinterop.GetDiskPackSource(buf, filepath.ToSlash(filepath.Base(inputFile)), filepath.Dir(inputFile)))
+			}
+			if err != nil {
+				return fmt.Errorf("failed to read pack metadata: %w", err)
 			}
 		}
 
@@ -145,13 +141,11 @@ var importCmd = &cobra.Command{
 				// Create file
 				err = os.WriteFile(indexFilePath, []byte{}, 0644)
 				if err != nil {
-					fmt.Printf("Error creating index file: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error creating index file: %w", err)
 				}
 				fmt.Println(indexFilePath + " created!")
 			} else if err != nil {
-				fmt.Printf("Error checking index file: %s\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error checking index file: %w", err)
 			}
 
 			pack = core.Pack{
@@ -181,8 +175,7 @@ var importCmd = &cobra.Command{
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 
 		modsList := packImport.Mods()
@@ -195,8 +188,7 @@ var importCmd = &cobra.Command{
 
 		modInfos, err := cfDefaultClient.getModInfoMultiple(modIDs)
 		if err != nil {
-			fmt.Printf("Failed to obtain project information: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to obtain project information: %w", err)
 		}
 
 		modInfosMap := make(map[uint32]modInfo)
@@ -239,8 +231,7 @@ var importCmd = &cobra.Command{
 
 		modFileInfos, err := cfDefaultClient.getFileInfoMultiple(remainingFileIDs)
 		if err != nil {
-			fmt.Printf("Failed to obtain project file information: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to obtain project file information: %w", err)
 		}
 
 		for _, v := range modFileInfos {
@@ -263,8 +254,7 @@ var importCmd = &cobra.Command{
 
 			err = createModFile(modInfoValue, modFileInfoValue, &index, v.OptionalDisabled)
 			if err != nil {
-				fmt.Printf("Failed to save project \"%s\": %s\n", modInfoValue.Name, err)
-				os.Exit(1)
+				return fmt.Errorf("failed to save project %q: %w", modInfoValue.Name, err)
 			}
 
 			modFilePath := getPathForFile(modInfoValue.GameID, modInfoValue.ClassID, modInfoValue.PrimaryCategoryID, modInfoValue.Slug)
@@ -282,8 +272,7 @@ var importCmd = &cobra.Command{
 		fmt.Println("Reading override files...")
 		filesList, err := packImport.GetFiles()
 		if err != nil {
-			fmt.Printf("Failed to read override files: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to read override files: %w", err)
 		}
 
 		successes = 0
@@ -312,38 +301,39 @@ var importCmd = &cobra.Command{
 					f, err = os.Create(filePath)
 				}
 				if err != nil {
-					fmt.Printf("Failed to write file \"%s\": %s\n", filePath, err)
 					if err2 != nil {
-						fmt.Printf("Failed to create directories: %s\n", err)
+						return fmt.Errorf("failed to create directories for %q: %w", filePath, err2)
 					}
-					continue
+					return fmt.Errorf("failed to write file %q: %w", filePath, err)
 				}
 			}
 			src, err := v.Open()
 			if err != nil {
-				fmt.Printf("Failed to read file \"%s\": %s\n", filePath, err)
-				f.Close()
-				continue
+				_ = f.Close()
+				return fmt.Errorf("failed to read file %q: %w", filePath, err)
 			}
 			_, err = io.Copy(f, src)
 			if err != nil {
-				fmt.Printf("Failed to copy file \"%s\": %s\n", filePath, err)
-				f.Close()
-				src.Close()
-				continue
+				_ = f.Close()
+				_ = src.Close()
+				return fmt.Errorf("failed to copy file %q: %w", filePath, err)
 			}
 
 			fmt.Printf("Copied file \"%s\" successfully!\n", filePath)
-			f.Close()
-			src.Close()
+			if err := f.Close(); err != nil {
+				_ = src.Close()
+				return fmt.Errorf("failed to close file %q: %w", filePath, err)
+			}
+			if err := src.Close(); err != nil {
+				return fmt.Errorf("failed to close source file %q: %w", filePath, err)
+			}
 			successes++
 		}
 		if len(filesList) > 0 {
 			fmt.Printf("Successfully copied %d/%d files!\n", successes, len(filesList))
 			err = index.Refresh()
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return fmt.Errorf("failed to refresh index: %w", err)
 			}
 		} else {
 			fmt.Println("No files copied!")
@@ -351,19 +341,17 @@ var importCmd = &cobra.Command{
 
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write index: %w", err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to update index hash: %w", err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write pack: %w", err)
 		}
+		return nil
 	},
 }
 

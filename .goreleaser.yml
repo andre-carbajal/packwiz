@@ -3,19 +3,75 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - env:
+  - id: linux
+    binary: packwiz
+    env:
       - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
+    goos: [linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -X github.com/andre-carbajal/packwiz/curseforge.cfApiKey={{ .Env.CURSEFORGE_API_KEY }}
+  - id: windows
+    binary: packwiz
+    env:
+      - CGO_ENABLED=0
+    goos: [windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -X github.com/andre-carbajal/packwiz/curseforge.cfApiKey={{ .Env.CURSEFORGE_API_KEY }}
+  - id: darwin
+    binary: packwiz
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -X github.com/andre-carbajal/packwiz/curseforge.cfApiKey={{ .Env.CURSEFORGE_API_KEY }}
+
+archives:
+  - id: linux
+    ids: [linux]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: windows
+    ids: [windows]
+    formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: darwin
+    ids: [darwin]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+scoops:
+  - name: packwiz
+    ids: [windows]
+    directory: bucket
+    repository:
+      owner: andre-carbajal
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+    homepage: https://github.com/andre-carbajal/packwiz
+    description: A command line tool for creating Minecraft modpacks
+    license: MIT
+
+homebrew_casks:
+  - name: packwiz
+    ids: [darwin, linux]
+    binaries: [packwiz]
+    directory: Casks
+    repository:
+      owner: andre-carbajal
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/andre-carbajal/packwiz
+    description: Manage Minecraft modpacks from the terminal
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
   version_template: "{{ incpatch .Version }}-devel"
+
 changelog:
   sort: asc
   filters:

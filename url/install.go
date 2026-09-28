@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -19,26 +18,26 @@ var installCmd = &cobra.Command{
 	Short:   "Add an external file from a direct download link, for sites that are not directly supported by packwiz",
 	Aliases: []string{"install", "get"},
 	Args:    cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 
 		dl, err := url.Parse(args[1])
 		if err != nil {
-			fmt.Println("Failed to parse URL:", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to parse URL: %w", err)
 		}
 		if dl.Scheme != "https" && dl.Scheme != "http" {
-			fmt.Println("Unsupported URL scheme:", dl.Scheme)
-			os.Exit(1)
+			return fmt.Errorf("unsupported URL scheme: %s", dl.Scheme)
 		}
 
 		// TODO: consider using colors for these warnings but those can have issues on windows
 		force, err := cmd.Flags().GetBool("force")
-		if !force && err == nil {
+		if err != nil {
+			return err
+		}
+		if !force {
 			var msg string
 			// TODO: update when github command is added
 			// TODO: make this generic?
@@ -52,21 +51,18 @@ var installCmd = &cobra.Command{
 				msg = "curseforge add " + args[1]
 			}
 			if msg != "" {
-				fmt.Println("Consider using packwiz", msg, "instead; if you know what you are doing use --force to add this file without update metadata.")
-				os.Exit(1)
+				return fmt.Errorf("consider using packwiz %s instead; use --force to add this file without update metadata", msg)
 			}
 		}
 
 		hash, err := getHash(args[1])
 		if err != nil {
-			fmt.Println("Failed to retrieve SHA256 hash for file", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to retrieve SHA256 hash for file: %w", err)
 		}
 
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 
 		filename := path.Base(dl.Path)
@@ -87,8 +83,7 @@ var installCmd = &cobra.Command{
 		}
 		destPathName, err := cmd.Flags().GetString("meta-name")
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 		if destPathName == "" {
 			destPathName = core.SlugifyName(args[0])
@@ -98,31 +93,28 @@ var installCmd = &cobra.Command{
 
 		format, hash, err := modMeta.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write mod metadata: %w", err)
 		}
 		err = index.RefreshFileWithHash(destPath, format, hash, true)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to refresh index: %w", err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write index: %w", err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to update index hash: %w", err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write pack: %w", err)
 		}
 		fmt.Printf("Successfully added %s (%s) from: %s\n", args[0], destPath, args[1])
-	}}
+		return nil
+	},
+}
 
 func getHash(url string) (string, error) {
 	mainHasher, err := core.GetHashImpl("sha256")

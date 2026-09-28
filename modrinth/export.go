@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"slices"
 	"sort"
 	"strconv"
@@ -22,59 +21,52 @@ var exportCmd = &cobra.Command{
 	Use:   "export",
 	Short: "Export the current modpack into a .mrpack for Modrinth",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 		// Do a refresh to ensure files are up to date
 		err = index.Refresh()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to refresh index: %w", err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to write index: %w", err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to update index hash: %w", err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to write modpack: %w", err)
 		}
 
 		fmt.Println("Reading external files...")
 		mods, err := index.LoadAllMods()
 		if err != nil {
-			fmt.Printf("Error reading file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading mod metadata: %w", err)
 		}
 
 		expFile, err := pack.CreateExportFile(viper.GetString("modrinth.export.output"), ".mrpack")
 		if err != nil {
-			fmt.Printf("Failed to create zip: %s\n", err.Error())
-			os.Exit(1)
+			return fmt.Errorf("failed to create zip: %w", err)
 		}
+		defer expFile.Close()
 		exp := zip.NewWriter(expFile)
+		defer exp.Close()
 
 		// Add an overrides folder even if there are no files to go in it
 		_, err = exp.Create("overrides/")
 		if err != nil {
-			fmt.Printf("Failed to add overrides folder: %s\n", err.Error())
-			os.Exit(1)
+			return fmt.Errorf("failed to add overrides folder: %w", err)
 		}
 
 		fmt.Printf("Retrieving %v external files...\n", len(mods))
@@ -90,18 +82,18 @@ var exportCmd = &cobra.Command{
 
 		session, err := core.CreateDownloadSession(mods, []string{"sha1", "sha512", "length-bytes"})
 		if err != nil {
-			fmt.Printf("Error retrieving external files: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error retrieving external files: %w", err)
 		}
 
-		cmdshared.ListManualDownloads(session)
+		if err := cmdshared.ListManualDownloads(session); err != nil {
+			return err
+		}
 
 		manifestFiles := make([]PackFile, 0)
 		for dl := range session.StartDownloads() {
 			if canBeIncludedDirectly(dl.Mod, restrictDomains) {
 				if dl.Error != nil {
-					fmt.Printf("Download of %s (%s) failed: %v\n", dl.Mod.Name, dl.Mod.FileName, dl.Error)
-					continue
+					return fmt.Errorf("download of %s (%s) failed: %w", dl.Mod.Name, dl.Mod.FileName, dl.Error)
 				}
 				for _, warning := range dl.Warnings {
 					fmt.Printf("Warning for %s (%s): %v\n", dl.Mod.Name, dl.Mod.FileName, warning)
@@ -109,9 +101,7 @@ var exportCmd = &cobra.Command{
 
 				path, err := index.RelIndexPath(dl.Mod.GetDestFilePath())
 				if err != nil {
-					fmt.Printf("Error resolving external file: %s\n", err.Error())
-					// TODO: exit(1)?
-					continue
+					return fmt.Errorf("error resolving external file: %w", err)
 				}
 
 				hashes := make(map[string]string)
@@ -119,7 +109,7 @@ var exportCmd = &cobra.Command{
 				hashes["sha512"] = dl.Hashes["sha512"]
 				fileSize, err := strconv.ParseUint(dl.Hashes["length-bytes"], 10, 64)
 				if err != nil {
-					panic(err)
+					return fmt.Errorf("invalid download size for %s: %w", dl.Mod.Name, err)
 				}
 
 				// Create env options based on configured optional/side
@@ -144,8 +134,7 @@ var exportCmd = &cobra.Command{
 				// Modrinth URLs must be RFC3986
 				u, err := core.ReencodeURL(dl.Mod.Download.URL)
 				if err != nil {
-					fmt.Printf("Error re-encoding download URL: %s\n", err.Error())
-					u = dl.Mod.Download.URL
+					return fmt.Errorf("error re-encoding download URL: %w", err)
 				}
 
 				manifestFiles = append(manifestFiles, PackFile{
@@ -161,12 +150,16 @@ var exportCmd = &cobra.Command{
 
 				fmt.Printf("%s (%s) added to manifest\n", dl.Mod.Name, dl.Mod.FileName)
 			} else {
+				var zipDir string
 				if dl.Mod.Side == core.ClientSide {
-					_ = cmdshared.AddToZip(dl, exp, "client-overrides", &index)
+					zipDir = "client-overrides"
 				} else if dl.Mod.Side == core.ServerSide {
-					_ = cmdshared.AddToZip(dl, exp, "server-overrides", &index)
+					zipDir = "server-overrides"
 				} else {
-					_ = cmdshared.AddToZip(dl, exp, "overrides", &index)
+					zipDir = "overrides"
+				}
+				if err := cmdshared.AddToZip(dl, exp, zipDir, &index); err != nil {
+					return err
 				}
 			}
 		}
@@ -177,17 +170,13 @@ var exportCmd = &cobra.Command{
 
 		err = session.SaveIndex()
 		if err != nil {
-			fmt.Printf("Error saving cache index: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error saving cache index: %w", err)
 		}
 
 		dependencies := make(map[string]string)
 		dependencies["minecraft"], err = pack.GetMCVersion()
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			fmt.Println("Error creating manifest: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error creating manifest: %w", err)
 		}
 		if quiltVersion, ok := pack.Versions["quilt"]; ok {
 			dependencies["quilt-loader"] = quiltVersion
@@ -215,36 +204,31 @@ var exportCmd = &cobra.Command{
 
 		manifestFile, err := exp.Create("modrinth.index.json")
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			fmt.Println("Error creating manifest: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error creating manifest: %w", err)
 		}
 
 		w := json.NewEncoder(manifestFile)
 		w.SetIndent("", "    ") // Documentation uses 4 spaces
 		err = w.Encode(manifest)
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			fmt.Println("Error writing manifest: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error writing manifest: %w", err)
 		}
 
-		cmdshared.AddNonMetafileOverrides(&index, exp)
+		if err := cmdshared.AddNonMetafileOverrides(&index, exp); err != nil {
+			return err
+		}
 
 		err = exp.Close()
 		if err != nil {
-			fmt.Println("Error writing export file: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error writing export file: %w", err)
 		}
 		err = expFile.Close()
 		if err != nil {
-			fmt.Println("Error writing export file: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error writing export file: %w", err)
 		}
 
 		fmt.Println("Modpack exported to " + expFile.Name())
+		return nil
 	},
 }
 

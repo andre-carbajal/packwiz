@@ -599,6 +599,7 @@ func TestFindLatestFile_GameVersionLatestFilesContribute(t *testing.T) {
 }
 
 func TestCfUpdater_CheckUpdate(t *testing.T) {
+	setTestCFAPIKey(t)
 	pack := core.Pack{
 		Versions: map[string]string{
 			"minecraft": "1.20.1",

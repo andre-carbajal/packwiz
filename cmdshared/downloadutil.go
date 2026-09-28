@@ -11,7 +11,7 @@ import (
 	"github.com/andre-carbajal/packwiz/core"
 )
 
-func ListManualDownloads(session core.DownloadSession) {
+func ListManualDownloads(session core.DownloadSession) error {
 	manualDownloads := session.GetManualDownloads()
 	if len(manualDownloads) > 0 {
 		fmt.Printf("Found %v manual downloads; these mods are unable to be downloaded by packwiz (due to API limitations) and must be manually downloaded:\n",
@@ -21,20 +21,19 @@ func ListManualDownloads(session core.DownloadSession) {
 		}
 		cacheDir, err := core.GetPackwizCache()
 		if err != nil {
-			fmt.Printf("Error locating cache folder: %v", err)
-			os.Exit(1)
+			return fmt.Errorf("error locating cache folder: %w", err)
 		}
 
 		fmt.Printf("Once you have done so, place these files in %s and re-run this command.\n",
 			filepath.Join(cacheDir, core.DownloadCacheImportFolder))
-		os.Exit(1)
+		return fmt.Errorf("waiting for %d manual download(s)", len(manualDownloads))
 	}
+	return nil
 }
 
-func AddToZip(dl core.CompletedDownload, exp *zip.Writer, dir string, index *core.Index) bool {
+func AddToZip(dl core.CompletedDownload, exp *zip.Writer, dir string, index *core.Index) error {
 	if dl.Error != nil {
-		fmt.Printf("Download of %s (%s) failed: %v\n", dl.Mod.Name, dl.Mod.FileName, dl.Error)
-		return false
+		return fmt.Errorf("download of %s (%s) failed: %w", dl.Mod.Name, dl.Mod.FileName, dl.Error)
 	}
 	for _, warning := range dl.Warnings {
 		fmt.Printf("Warning for %s (%s): %v\n", dl.Mod.Name, dl.Mod.FileName, warning)
@@ -42,31 +41,27 @@ func AddToZip(dl core.CompletedDownload, exp *zip.Writer, dir string, index *cor
 
 	p, err := index.RelIndexPath(dl.Mod.GetDestFilePath())
 	if err != nil {
-		fmt.Printf("Error resolving external file: %v\n", err)
-		return false
+		return fmt.Errorf("error resolving external file: %w", err)
 	}
 	modFile, err := exp.Create(path.Join(dir, p))
 	if err != nil {
-		fmt.Printf("Error creating metadata file %s: %v\n", p, err)
-		return false
+		return fmt.Errorf("error creating metadata file %s: %w", p, err)
 	}
 	_, err = io.Copy(modFile, dl.File)
 	if err != nil {
-		fmt.Printf("Error copying file %s: %v\n", p, err)
-		return false
+		return fmt.Errorf("error copying file %s: %w", p, err)
 	}
 	err = dl.File.Close()
 	if err != nil {
-		fmt.Printf("Error closing file %s: %v\n", p, err)
-		return false
+		return fmt.Errorf("error closing file %s: %w", p, err)
 	}
 
 	fmt.Printf("%s (%s) added to zip\n", dl.Mod.Name, dl.Mod.FileName)
-	return true
+	return nil
 }
 
 // AddNonMetafileOverrides saves all non-metadata files into an overrides folder in the zip
-func AddNonMetafileOverrides(index *core.Index, exp *zip.Writer) {
+func AddNonMetafileOverrides(index *core.Index, exp *zip.Writer) error {
 	for p, v := range index.Files {
 		if v.IsMetaFile() {
 			continue
@@ -74,28 +69,25 @@ func AddNonMetafileOverrides(index *core.Index, exp *zip.Writer) {
 		for _, aliasPath := range v.AliasPaths() {
 			file, err := exp.Create(path.Join("overrides", aliasPath))
 			if err != nil {
-				fmt.Printf("Error creating file: %s\n", err.Error())
-				// TODO: exit(1)?
-				continue
+				return fmt.Errorf("error creating override %s: %w", aliasPath, err)
 			}
 			// Attempt to read the file from disk, without checking hashes (assumed to have no errors)
 			src, err := os.Open(index.ResolveIndexPath(p))
 			if err != nil {
-				fmt.Printf("Error reading file: %s\n", err.Error())
-				// TODO: exit(1)?
-				continue
+				return fmt.Errorf("error reading override %s: %w", p, err)
 			}
 			_, err = io.Copy(file, src)
 			if err != nil {
 				_ = src.Close()
-				fmt.Printf("Error copying file: %s\n", err.Error())
-				// TODO: exit(1)?
-				continue
+				return fmt.Errorf("error copying override %s: %w", p, err)
 			}
 
-			_ = src.Close()
+			if err := src.Close(); err != nil {
+				return fmt.Errorf("error closing override %s: %w", p, err)
+			}
 		}
 	}
+	return nil
 }
 
 func PrintDisclaimer(isCf bool) {

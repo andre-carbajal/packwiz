@@ -3,7 +3,6 @@ package cmdshared
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"time"
 
@@ -24,18 +23,17 @@ type McVersionManifest struct {
 	} `json:"versions"`
 }
 
-func (m McVersionManifest) CheckValid(version string) {
+func (m McVersionManifest) CheckValid(version string) error {
 	for _, v := range m.Versions {
 		if v.ID == version {
-			return
+			return nil
 		}
 	}
-	fmt.Println("Given version is not a valid Minecraft version!")
-	os.Exit(1)
+	return fmt.Errorf("given version %q is not a valid Minecraft version", version)
 }
 
 func GetValidMCVersions() (McVersionManifest, error) {
-	res, err := core.GetWithUA("https://launchermeta.mojang.com/mc/game/version_manifest.json", "application/json")
+	res, err := core.GetAPIWithUA("https://launchermeta.mojang.com/mc/game/version_manifest.json", "application/json")
 	if err != nil {
 		return McVersionManifest{}, err
 	}

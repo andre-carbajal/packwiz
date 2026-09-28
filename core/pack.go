@@ -138,20 +138,12 @@ func (pack *Pack) UpdateIndexHash() error {
 
 // Write saves the pack file
 func (pack Pack) Write() error {
-	f, err := os.Create(viper.GetString("pack-file"))
-	if err != nil {
-		return err
-	}
-
-	enc := toml.NewEncoder(f)
-	// Disable indentation
-	enc.Indent = ""
-	err = enc.Encode(pack)
-	if err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
+	return atomicWriteFile(viper.GetString("pack-file"), func(w io.Writer) error {
+		enc := toml.NewEncoder(w)
+		// Disable indentation
+		enc.Indent = ""
+		return enc.Encode(pack)
+	})
 }
 
 // GetMCVersion gets the version of Minecraft this pack uses, if it has been correctly specified

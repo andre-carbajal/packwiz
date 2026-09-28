@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -31,36 +32,35 @@ var serveCmd = &cobra.Command{
 	Long:    `Run a local HTTP server for development, automatically refreshing the index when it is queried`,
 	Aliases: []string{"server"},
 	Args:    cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		port := strconv.Itoa(viper.GetInt("serve.port"))
+		address := serveAddress(viper.GetString("serve.host"), port)
+		mux := http.NewServeMux()
 
 		if viper.GetBool("serve.basic") {
-			http.Handle("/", http.FileServer(http.Dir(".")))
+			mux.Handle("/", http.FileServer(http.Dir(".")))
 		} else {
 			fmt.Println("Loading modpack...")
 			pack, err := core.LoadPack()
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return fmt.Errorf("failed to load modpack: %w", err)
 			}
 			index, err := pack.LoadIndex()
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return fmt.Errorf("failed to load index: %w", err)
 			}
 			packServeDir := filepath.Dir(viper.GetString("pack-file"))
 			packFileName := filepath.Base(viper.GetString("pack-file"))
 
 			t, err := template.New("index-page").Parse(indexPage)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return fmt.Errorf("failed to parse index page template: %w", err)
 			}
 
 			indexPageBuf := new(bytes.Buffer)
 			err = t.Execute(indexPageBuf, struct{ Port string }{Port: port})
 			if err != nil {
-				panic(fmt.Errorf("failed to compile index page template: %w", err))
+				return fmt.Errorf("failed to render index page template: %w", err)
 			}
 
 			// Force-disable no-internal-hashes mode (equiv to --build flag in refresh) for serving over HTTP
@@ -69,7 +69,7 @@ var serveCmd = &cobra.Command{
 				viper.Set("no-internal-hashes", false)
 			}
 
-			http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+			mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 				if req.URL.Path == "/" {
 					_, _ = w.Write(indexPageBuf.Bytes())
 					return
@@ -97,13 +97,15 @@ var serveCmd = &cobra.Command{
 						refreshMutex.Lock()
 						// Reload pack and index (might have changed on disk)
 						err = doServeRefresh(&pack, &index)
+						refreshMutex.Unlock()
 						if err != nil {
 							fmt.Println("Failed to refresh pack", err)
+							w.WriteHeader(http.StatusInternalServerError)
+							_, _ = w.Write([]byte("Failed to refresh pack"))
 							return
 						}
 
-						// Downgrade to a read lock
-						refreshMutex.Unlock()
+						// Release the write lock; this request takes a read lock below.
 					}
 					refreshMutex.RLock()
 				} else {
@@ -140,13 +142,16 @@ var serveCmd = &cobra.Command{
 			})
 		}
 
-		fmt.Println("Running on port " + port)
-		err := http.ListenAndServe(":"+port, nil)
-		if err != nil {
-			fmt.Printf("Error running server: %s\n", err)
-			os.Exit(1)
+		fmt.Println("Running on " + address)
+		if err := http.ListenAndServe(address, mux); err != nil {
+			return fmt.Errorf("error running server: %w", err)
 		}
+		return nil
 	},
+}
+
+func serveAddress(host, port string) string {
+	return net.JoinHostPort(host, port)
 }
 
 func doServeRefresh(pack *core.Pack, index *core.Index) error {
@@ -185,6 +190,8 @@ func init() {
 
 	serveCmd.Flags().IntP("port", "p", 8080, "The port to run the server on")
 	_ = viper.BindPFlag("serve.port", serveCmd.Flags().Lookup("port"))
+	serveCmd.Flags().String("host", "127.0.0.1", "The interface address to bind the server to")
+	_ = viper.BindPFlag("serve.host", serveCmd.Flags().Lookup("host"))
 	serveCmd.Flags().BoolP("refresh", "r", true, "Automatically refresh the index file")
 	_ = viper.BindPFlag("serve.refresh", serveCmd.Flags().Lookup("refresh"))
 	serveCmd.Flags().Bool("basic", false, "Disable refreshing and allow all files in the directory, rather than just files listed in the index")

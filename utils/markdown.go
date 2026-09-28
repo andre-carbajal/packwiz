@@ -15,20 +15,19 @@ var markdownCmd = &cobra.Command{
 	Short:   "Generate markdown documentation (that you might be reading right now!!)",
 	Aliases: []string{"md"},
 	Args:    cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		outDir := viper.GetString("utils.markdown.dir")
 		err := os.MkdirAll(outDir, os.ModePerm)
 		if err != nil {
-			fmt.Printf("Error creating directory: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating directory: %w", err)
 		}
 		disableTag(cmd.Root())
 		err = doc.GenMarkdownTree(cmd.Root(), outDir)
 		if err != nil {
-			fmt.Printf("Error generating markdown: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error generating markdown: %w", err)
 		}
 		fmt.Println("Generated markdown successfully!")
+		return nil
 	},
 }
 

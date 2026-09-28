@@ -9,21 +9,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-func PromptYesNo(prompt string) bool {
+func PromptYesNo(prompt string) (bool, error) {
 	fmt.Print(prompt)
 	if viper.GetBool("non-interactive") {
 		fmt.Println("Y (non-interactive mode)")
-		return true
+		return true, nil
 	}
 	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
-		fmt.Printf("Failed to prompt user: %v\n", err)
-		os.Exit(1)
+		return false, fmt.Errorf("failed to prompt user: %w", err)
 	}
 
 	ansNormal := strings.ToLower(strings.TrimSpace(answer))
 	if len(ansNormal) > 0 && ansNormal[0] == 'n' {
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }

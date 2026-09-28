@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bufio"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/andre-carbajal/packwiz/cmdshared"
@@ -19,51 +18,43 @@ var exportCmd = &cobra.Command{
 	Use:   "export",
 	Short: "Export the current modpack into a .zip for curseforge",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		side := viper.GetString("curseforge.export.side")
 		if side != core.UniversalSide && side != core.ServerSide && side != core.ClientSide {
-			fmt.Printf("Invalid side %q, must be one of client, server, or both (default)\n", side)
-			os.Exit(1)
+			return fmt.Errorf("invalid side %q, must be one of client, server, or both", side)
 		}
 
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 		// Do a refresh to ensure files are up to date
 		err = index.Refresh()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to refresh index: %w", err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write index: %w", err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to update index hash: %w", err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write modpack: %w", err)
 		}
 
 		fmt.Println("Reading external files...")
 		mods, err := index.LoadAllMods()
 		if err != nil {
-			fmt.Printf("Error reading file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading mod metadata: %w", err)
 		}
 		i := 0
 		// Filter mods by side
@@ -81,23 +72,22 @@ var exportCmd = &cobra.Command{
 		if ok {
 			exportData, err = parseExportData(exportDataUnparsed)
 			if err != nil {
-				fmt.Printf("Failed to parse export metadata: %s\n", err.Error())
-				os.Exit(1)
+				return fmt.Errorf("failed to parse export metadata: %w", err)
 			}
 		}
 
 		expFile, err := pack.CreateExportFile(viper.GetString("curseforge.export.output"), ".zip")
 		if err != nil {
-			fmt.Printf("Failed to create zip: %s\n", err.Error())
-			os.Exit(1)
+			return fmt.Errorf("failed to create zip: %w", err)
 		}
+		defer expFile.Close()
 		exp := zip.NewWriter(expFile)
+		defer exp.Close()
 
 		// Add an overrides folder even if there are no files to go in it
 		_, err = exp.Create("overrides/")
 		if err != nil {
-			fmt.Printf("Failed to add overrides folder: %s\n", err.Error())
-			os.Exit(1)
+			return fmt.Errorf("failed to add overrides folder: %w", err)
 		}
 
 		cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
@@ -124,61 +114,55 @@ var exportCmd = &cobra.Command{
 
 			session, err := core.CreateDownloadSession(nonCfMods, []string{})
 			if err != nil {
-				fmt.Printf("Error retrieving external files: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error retrieving external files: %w", err)
 			}
 
-			cmdshared.ListManualDownloads(session)
+			if err := cmdshared.ListManualDownloads(session); err != nil {
+				return err
+			}
 
 			for dl := range session.StartDownloads() {
-				_ = cmdshared.AddToZip(dl, exp, "overrides", &index)
+				if err := cmdshared.AddToZip(dl, exp, "overrides", &index); err != nil {
+					return err
+				}
 			}
 
 			err = session.SaveIndex()
 			if err != nil {
-				fmt.Printf("Error saving cache index: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error saving cache index: %w", err)
 			}
 		}
 
 		manifestFile, err := exp.Create("manifest.json")
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			fmt.Println("Error creating manifest: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error creating manifest: %w", err)
 		}
 
 		err = packinterop.WriteManifestFromPack(pack, cfFileRefs, exportData.ProjectID, manifestFile)
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			fmt.Println("Error writing manifest: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error writing manifest: %w", err)
 		}
 
 		err = createModlist(exp, mods)
 		if err != nil {
-			_ = exp.Close()
-			_ = expFile.Close()
-			fmt.Println("Error creating mod list: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error creating mod list: %w", err)
 		}
 
-		cmdshared.AddNonMetafileOverrides(&index, exp)
+		if err := cmdshared.AddNonMetafileOverrides(&index, exp); err != nil {
+			return err
+		}
 
 		err = exp.Close()
 		if err != nil {
-			fmt.Println("Error writing export file: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error writing export file: %w", err)
 		}
 		err = expFile.Close()
 		if err != nil {
-			fmt.Println("Error writing export file: " + err.Error())
-			os.Exit(1)
+			return fmt.Errorf("error writing export file: %w", err)
 		}
 
 		fmt.Println("Modpack exported to " + expFile.Name())
+		return nil
 	},
 }
 

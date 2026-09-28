@@ -7,20 +7,45 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
-func TestDecodeDefaultKey(t *testing.T) {
-	// The default API key is a hardcoded base64 string at the top of
-	// request.go. decodeDefaultKey should produce a non-empty result;
-	// failure would panic (caught by the test runner).
-	got := decodeDefaultKey()
+func setTestCFAPIKey(t *testing.T) {
+	t.Helper()
+	previous := cfApiKey
+	cfApiKey = "test-api-key"
+	t.Setenv("CURSEFORGE_API_KEY", "")
+	t.Cleanup(func() { cfApiKey = previous })
+}
 
-	if got == "" {
-		t.Fatal("decodeDefaultKey returned empty string")
+func TestConfiguredCFAPIKey(t *testing.T) {
+	previous := cfApiKey
+	cfApiKey = "linked-test-key"
+	t.Cleanup(func() { cfApiKey = previous })
+	t.Setenv("CURSEFORGE_API_KEY", "environment-test-key")
+
+	if got := configuredCFAPIKey(); got != "environment-test-key" {
+		t.Fatalf("configuredCFAPIKey() = %q, want environment key", got)
 	}
 
-	// The decoded value should not still look like base64 — sanity
-	// check that decoding actually happened.
-	if got == cfApiKeyDefault {
-		t.Errorf("decoded value equals the base64 input, decoding likely failed")
+	t.Setenv("CURSEFORGE_API_KEY", "")
+	if got := configuredCFAPIKey(); got != "linked-test-key" {
+		t.Fatalf("configuredCFAPIKey() = %q, want linked fallback key", got)
+	}
+
+	cfApiKey = ""
+	t.Setenv("CURSEFORGE_API_KEY", "environment-test-key")
+	if got := configuredCFAPIKey(); got != "environment-test-key" {
+		t.Fatalf("configuredCFAPIKey() = %q, want environment key without linked key", got)
+	}
+}
+
+func TestMissingCFAPIKeyFailsClearly(t *testing.T) {
+	previous := cfApiKey
+	cfApiKey = ""
+	t.Setenv("CURSEFORGE_API_KEY", "")
+	t.Cleanup(func() { cfApiKey = previous })
+
+	_, err := cfDefaultClient.makeGet("/v1/mods/1")
+	if err == nil || err.Error() != "CurseForge API key is not configured; use an official release build or set CURSEFORGE_API_KEY" {
+		t.Fatalf("makeGet error = %v, want missing-key error", err)
 	}
 }
 
@@ -106,6 +131,7 @@ func TestModFileInfoGetBestHash(t *testing.T) {
 }
 
 func TestGetModInfo(t *testing.T) {
+	setTestCFAPIKey(t)
 	t.Run("happy path returns the deserialized mod", func(t *testing.T) {
 		httpmock.Activate(t)
 
@@ -173,6 +199,7 @@ func TestGetModInfo(t *testing.T) {
 }
 
 func TestGetFileInfo(t *testing.T) {
+	setTestCFAPIKey(t)
 	t.Run("happy path returns the deserialized file", func(t *testing.T) {
 		httpmock.Activate(t)
 
@@ -234,6 +261,7 @@ func TestGetFileInfo(t *testing.T) {
 }
 
 func TestGetModInfoMultiple(t *testing.T) {
+	setTestCFAPIKey(t)
 	httpmock.Activate(t)
 
 	body := `{"data":[
@@ -263,6 +291,7 @@ func TestGetModInfoMultiple(t *testing.T) {
 }
 
 func TestGetFileInfoMultiple(t *testing.T) {
+	setTestCFAPIKey(t)
 	httpmock.Activate(t)
 
 	body := `{"data":[
@@ -289,6 +318,7 @@ func TestGetFileInfoMultiple(t *testing.T) {
 }
 
 func TestGetSearch(t *testing.T) {
+	setTestCFAPIKey(t)
 	httpmock.Activate(t)
 
 	body := `{"data":[
@@ -318,6 +348,7 @@ func TestGetSearch(t *testing.T) {
 }
 
 func TestGetGames(t *testing.T) {
+	setTestCFAPIKey(t)
 	httpmock.Activate(t)
 
 	// The gameStatus and gameApiStatus enums are encoded as uints,
@@ -354,6 +385,7 @@ func TestGetGames(t *testing.T) {
 }
 
 func TestGetCategories(t *testing.T) {
+	setTestCFAPIKey(t)
 	httpmock.Activate(t)
 
 	body := `{"data":[
@@ -386,6 +418,7 @@ func TestGetCategories(t *testing.T) {
 }
 
 func TestGetFingerprintInfo(t *testing.T) {
+	setTestCFAPIKey(t)
 	httpmock.Activate(t)
 
 	// Body covers the three branches detect.go cares about: an exact

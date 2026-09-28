@@ -18,17 +18,15 @@ var detectCmd = &cobra.Command{
 	Use:   "detect",
 	Short: "Detect .jar files in the mods folder (experimental)",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 
 		// Walk files in the mods folder
@@ -56,15 +54,13 @@ var detectCmd = &cobra.Command{
 			return nil
 		})
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to scan mods directory: %w", err)
 		}
 		fmt.Printf("Found %d files, submitting...\n", len(hashes))
 
 		res, err := cfDefaultClient.getFingerprintInfo(hashes)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to match CurseForge fingerprints: %w", err)
 		}
 
 		fmt.Printf("Successfully matched %d files\n", len(res.ExactFingerprints))
@@ -88,8 +84,7 @@ var detectCmd = &cobra.Command{
 		}
 		modInfos, err := cfDefaultClient.getModInfoMultiple(ids)
 		if err != nil {
-			fmt.Printf("Failed to retrieve metadata: %v", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to retrieve metadata: %w", err)
 		}
 		modInfosMap := make(map[uint32]modInfo)
 		for _, v := range modInfos {
@@ -100,16 +95,14 @@ var detectCmd = &cobra.Command{
 		for _, v := range res.ExactMatches {
 			err = createModFile(modInfosMap[v.ID], v.File, &index, false)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return fmt.Errorf("failed to create metadata: %w", err)
 			}
 
 			path, ok := modPaths[v.File.Fingerprint]
 			if ok {
 				err = os.Remove(path)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					return fmt.Errorf("failed to remove detected file %s: %w", path, err)
 				}
 			}
 		}
@@ -117,24 +110,21 @@ var detectCmd = &cobra.Command{
 
 		err = index.Refresh()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to refresh index: %w", err)
 		}
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to write index: %w", err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to update index hash: %w", err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return fmt.Errorf("failed to write pack: %w", err)
 		}
+		return nil
 	},
 }
 

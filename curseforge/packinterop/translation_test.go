@@ -1,12 +1,21 @@
 package packinterop
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/andre-carbajal/packwiz/core"
 )
+
+func TestReadMetadataReturnsParseErrors(t *testing.T) {
+	source := GetDiskPackSource(bufio.NewReader(strings.NewReader("{")), "manifest.json", t.TempDir())
+	if _, err := ReadMetadata(source); err == nil {
+		t.Fatal("ReadMetadata returned no error for invalid JSON")
+	}
+}
 
 func TestWriteManifestFromPack_RoundTrip(t *testing.T) {
 	// Write a pack out to a manifest, parse it back into

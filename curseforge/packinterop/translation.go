@@ -5,45 +5,48 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/andre-carbajal/packwiz/core"
 )
 
-func ReadMetadata(s ImportPackSource) ImportPackMetadata {
+func ReadMetadata(s ImportPackSource) (ImportPackMetadata, error) {
 	var packImport ImportPackMetadata
 	metaFile := s.GetPackFile()
 	rdr, err := metaFile.Open()
 	if err != nil {
-		fmt.Printf("Error reading file: %s\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error reading file: %w", err)
 	}
 
 	// Read the whole file (as we are going to parse it multiple times)
 	fileData, err := io.ReadAll(rdr)
 	if err != nil {
-		fmt.Printf("Error reading file: %s\n", err)
-		os.Exit(1)
+		_ = rdr.Close()
+		return nil, fmt.Errorf("error reading file: %w", err)
+	}
+	if err := rdr.Close(); err != nil {
+		return nil, fmt.Errorf("error closing file: %w", err)
 	}
 
 	// Determine what format the file is
 	var jsonFile map[string]any
 	err = json.Unmarshal(fileData, &jsonFile)
 	if err != nil {
-		fmt.Printf("Error parsing JSON: %s\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error parsing JSON: %w", err)
 	}
 
 	isManifest := false
 	if v, ok := jsonFile["manifestType"]; ok {
-		isManifest = v.(string) == "minecraftModpack"
+		manifestType, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("manifestType must be a string")
+		}
+		isManifest = manifestType == "minecraftModpack"
 	}
 	if isManifest {
 		packMeta := cursePackMeta{importSrc: s}
 		err = json.Unmarshal(fileData, &packMeta)
 		if err != nil {
-			fmt.Printf("Error parsing JSON: %s\n", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("error parsing JSON: %w", err)
 		}
 		packImport = packMeta
 	} else {
@@ -52,13 +55,12 @@ func ReadMetadata(s ImportPackSource) ImportPackMetadata {
 		packMeta := twitchInstalledPackMeta{importSrc: s}
 		err = json.Unmarshal(fileData, &packMeta)
 		if err != nil {
-			fmt.Printf("Error parsing JSON: %s\n", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("error parsing JSON: %w", err)
 		}
 		packImport = packMeta
 	}
 
-	return packImport
+	return packImport, nil
 }
 
 // AddonFileReference is a struct to reference a single file on CurseForge

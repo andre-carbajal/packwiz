@@ -16,53 +16,63 @@ var minecraftCommand = &cobra.Command{
 	Short:   "Migrate your Minecraft version to a newer version.",
 	Aliases: []string{"mc"},
 	Args:    cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		modpack, err := core.LoadPack()
 		if err != nil {
 			// Check if it's a no such file or directory error
 			if os.IsNotExist(err) {
-				fmt.Println("No pack.toml file found, run 'packwiz init' to create one!")
-				os.Exit(1)
+				return fmt.Errorf("no pack.toml file found, run 'packwiz init' to create one: %w", err)
 			}
-			fmt.Printf("Error loading pack: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error loading pack: %w", err)
 		}
 		currentVersion, err := modpack.GetMCVersion()
 		if err != nil {
-			fmt.Printf("Error getting Minecraft version from pack: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error getting Minecraft version from pack: %w", err)
 		}
 		wantedMCVersion := args[0]
 		if wantedMCVersion == currentVersion {
 			fmt.Printf("Minecraft version is already %s!\n", wantedMCVersion)
-			os.Exit(0)
+			return nil
 		}
 		mcVersions, err := cmdshared.GetValidMCVersions()
 		if err != nil {
-			fmt.Printf("Error getting Minecraft versions: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error getting Minecraft versions: %w", err)
 		}
-		mcVersions.CheckValid(wantedMCVersion)
+		if err := mcVersions.CheckValid(wantedMCVersion); err != nil {
+			return err
+		}
 		// Set the version in the pack
 		modpack.Versions["minecraft"] = wantedMCVersion
 		// Write the pack to disk
 		err = modpack.Write()
 		if err != nil {
-			fmt.Printf("Error writing pack.toml: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error writing pack.toml: %w", err)
 		}
 		fmt.Printf("Successfully updated Minecraft version to %s\n", wantedMCVersion)
 		// Prompt the user if they want to update the loader too while they're at it.
-		if cmdshared.PromptYesNo("Would you like to update your loader version to the latest version for this Minecraft version? [Y/n] ") {
+		updateLoader, err := cmdshared.PromptYesNo("Would you like to update your loader version to the latest version for this Minecraft version? [Y/n] ")
+		if err != nil {
+			return err
+		}
+		if updateLoader {
 			// We'll run the loader command to update to latest
-			loaderCommand.Run(loaderCommand, []string{"latest"})
+			if err := loaderCommand.RunE(loaderCommand, []string{"latest"}); err != nil {
+				return err
+			}
 		}
 		// Prompt the user to update their mods too.
-		if cmdshared.PromptYesNo("Would you like to update your mods to the latest versions for this Minecraft version? [Y/n] ") {
+		updateMods, err := cmdshared.PromptYesNo("Would you like to update your mods to the latest versions for this Minecraft version? [Y/n] ")
+		if err != nil {
+			return err
+		}
+		if updateMods {
 			// Run the update command
 			viper.Set("update.all", true)
-			packCmd.UpdateCmd.Run(packCmd.UpdateCmd, []string{})
+			if err := packCmd.UpdateCmd.RunE(packCmd.UpdateCmd, []string{}); err != nil {
+				return err
+			}
 		}
+		return nil
 	},
 }
 

@@ -3,7 +3,6 @@ package modrinth
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -23,17 +22,15 @@ var installCmd = &cobra.Command{
 	Short:   "Add a project from a Modrinth URL, slug/project ID or search",
 	Aliases: []string{"install", "get"},
 	Args:    cobra.ArbitraryArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 
 		// If project/version IDs/version file name is provided in command line, use those
@@ -41,15 +38,13 @@ var installCmd = &cobra.Command{
 		if projectIDFlag != "" {
 			projectID = projectIDFlag
 			if len(args) != 0 {
-				fmt.Println("--project-id cannot be used with a separately specified URL/slug/search term")
-				os.Exit(1)
+				return errors.New("--project-id cannot be used with a separately specified URL/slug/search term")
 			}
 		}
 		if versionIDFlag != "" {
 			versionID = versionIDFlag
 			if len(args) != 0 {
-				fmt.Println("--version-id cannot be used with a separately specified URL/slug/search term")
-				os.Exit(1)
+				return errors.New("--version-id cannot be used with a separately specified URL/slug/search term")
 			}
 		}
 		if versionFilenameFlag != "" {
@@ -57,8 +52,7 @@ var installCmd = &cobra.Command{
 		}
 
 		if (len(args) == 0 || len(args[0]) == 0) && projectID == "" {
-			fmt.Println("You must specify a project; with the ID flags, or by passing a URL, slug or search term directly.")
-			os.Exit(1)
+			return errors.New("you must specify a project; use an ID flag or pass a URL, slug, or search term")
 		}
 
 		var version string
@@ -67,8 +61,7 @@ var installCmd = &cobra.Command{
 			// Try interpreting the argument as a slug/project ID, or project/version/CDN URL
 			parsedSlug, err = parseSlugOrUrl(args[0], &projectID, &version, &versionID, &versionFilename)
 			if err != nil {
-				fmt.Printf("Failed to parse URL: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to parse URL: %w", err)
 			}
 		}
 
@@ -76,10 +69,9 @@ var installCmd = &cobra.Command{
 		if versionID != "" {
 			err = installVersionById(versionID, versionFilename, pack, &index)
 			if err != nil {
-				fmt.Printf("Failed to add project: %s\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to add project: %w", err)
 			}
-			return
+			return nil
 		}
 
 		// Look up project ID
@@ -93,24 +85,21 @@ var installCmd = &cobra.Command{
 					// Try to look up version number
 					versionData, err := resolveVersion(project, version)
 					if err != nil {
-						fmt.Printf("Failed to add project: %s\n", err)
-						os.Exit(1)
+						return fmt.Errorf("failed to add project: %w", err)
 					}
 					err = installVersion(project, versionData, versionFilename, pack, &index)
 					if err != nil {
-						fmt.Printf("Failed to add project: %s\n", err)
-						os.Exit(1)
+						return fmt.Errorf("failed to add project: %w", err)
 					}
-					return
+					return nil
 				}
 
 				// No version specified; find latest
 				err = installProject(project, versionFilename, pack, &index)
 				if err != nil {
-					fmt.Printf("Failed to add project: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("failed to add project: %w", err)
 				}
-				return
+				return nil
 			}
 		}
 
@@ -118,13 +107,12 @@ var installCmd = &cobra.Command{
 		if projectID == "" || parsedSlug {
 			err = installViaSearch(strings.Join(args, " "), versionFilename, !parsedSlug, pack, &index)
 			if err != nil {
-				fmt.Printf("Failed to add project: %s\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to add project: %w", err)
 			}
 		} else {
-			fmt.Printf("Failed to add project: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to add project: %w", err)
 		}
+		return nil
 	},
 }
 
@@ -350,7 +338,11 @@ func installVersion(project *modrinthApi.Project, version *modrinthApi.Version, 
 					fmt.Println(*v.projectInfo.Title)
 				}
 
-				if cmdshared.PromptYesNo("Would you like to add them? [Y/n]: ") {
+				addDependencies, err := cmdshared.PromptYesNo("Would you like to add them? [Y/n]: ")
+				if err != nil {
+					return err
+				}
+				if addDependencies {
 					for _, v := range depMetadata {
 						err := createFileMeta(v.projectInfo, v.versionInfo, v.fileInfo, pack, index)
 						if err != nil {

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"time"
 
 	modrinthApi "codeberg.org/theepicblock/go-modrinth/modrinth"
 	"github.com/andre-carbajal/packwiz/cmd"
@@ -23,7 +24,9 @@ var modrinthCmd = &cobra.Command{
 	Short:   "Manage modrinth-based mods",
 }
 
-var mrDefaultClient = modrinthApi.NewClient(&http.Client{})
+// API metadata responses are small; the separate download path intentionally
+// remains without a total timeout so large mod files can stream to completion.
+var mrDefaultClient = modrinthApi.NewClient(&http.Client{Timeout: 30 * time.Second})
 
 func init() {
 	cmd.Add(modrinthCmd)

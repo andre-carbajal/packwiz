@@ -1,38 +1,28 @@
-name: nix
+name: Nix package
 on:
   push:
     branches: [main]
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  update-vendor-sha:
-    name: vendor-sha
+  build:
+    name: Build release package
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Checkout repo
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-    - name: Install nix
-      uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
-      with:
-        extra_nix_config: |
-          experimental-features = nix-command flakes
-        nix_path: nixpkgs=channel:nixos-unstable
-      env:
-        NIX_CONFIG: access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - name: Build pinned release package
+        run: nix build --print-build-logs .#packwiz
 
-    - name: Update packwiz version
-      run: nix run nixpkgs#nix-update -- -F --version=skip packwiz
-      env:
-        NIX_CONFIG: access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-
-    - name: Commit
-      uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
-      with:
-        commit_message: "chore: update packwiz vendorHash"
-        branch: main
+      - name: Check executable
+        run: ./result/bin/packwiz --help

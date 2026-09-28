@@ -26,14 +26,30 @@ Join my Discord server if you need help [here](https://discord.gg/Csh8zbbhCt)!
 ## Installation
 Stable prebuilt binaries are available from [GitHub Releases](https://github.com/andre-carbajal/packwiz/releases/latest).
 
+On macOS or Linux, install with Homebrew:
+
+```sh
+brew install --cask andre-carbajal/tap/packwiz
+```
+
+On Windows, install with Scoop:
+
+```powershell
+scoop bucket add andre-carbajal https://github.com/andre-carbajal/scoop-bucket
+scoop install packwiz
+```
+
+On Linux or macOS with Nix flakes enabled:
+
+```sh
+nix profile install github:andre-carbajal/packwiz#packwiz
+```
+
 Development snapshots are available from [nightly.link](https://nightly.link/andre-carbajal/packwiz/workflows/go/main).
 
 To run the executable, first extract it, then add the folder where you extracted it to your PATH environment variable ([see tutorial for Windows here](https://www.howtogeek.com/118594/how-to-edit-your-system-path-for-easy-command-line-access/)) or move it to where you want to use it.
 
-You can also install the latest version from source with Go:
-
-1. Install Go (1.24 or newer) from https://golang.org/dl/
-2. Run `go install github.com/andre-carbajal/packwiz@latest`. Be patient, it has to download and compile dependencies as well!
+Building for development requires Go 1.26.8 or newer. CurseForge API access in a local build requires setting `CURSEFORGE_API_KEY`; official release and snapshot binaries embed the configured key at build time. Anyone can extract it from a distributed binary, so it must be treated as public rather than confidential.
 
 ## Documentation
 See https://packwiz.infra.link/ for the full packwiz documentation!

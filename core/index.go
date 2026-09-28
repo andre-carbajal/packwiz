@@ -268,20 +268,12 @@ func (in Index) Write() error {
 	}
 
 	// TODO: calculate and provide hash while writing?
-	f, err := os.Create(in.indexFile)
-	if err != nil {
-		return err
-	}
-
-	enc := toml.NewEncoder(f)
-	// Disable indentation
-	enc.Indent = ""
-	err = enc.Encode(rep)
-	if err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
+	return atomicWriteFile(in.indexFile, func(w io.Writer) error {
+		enc := toml.NewEncoder(w)
+		// Disable indentation
+		enc.Indent = ""
+		return enc.Encode(rep)
+	})
 }
 
 // RefreshFileWithHash updates a file in the index, given a file hash and whether it should be marked as metafile or not

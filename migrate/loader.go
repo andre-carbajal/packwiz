@@ -14,80 +14,70 @@ var loaderCommand = &cobra.Command{
 	Use:   "loader [version|latest|recommended]",
 	Short: "Migrate your modloader version to a newer version.",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		modpack, err := core.LoadPack()
 		if err != nil {
-			// Check if it's a no such file or directory error
 			if os.IsNotExist(err) {
-				fmt.Println("No pack.toml file found, run 'packwiz init' to create one!")
-				os.Exit(1)
+				return fmt.Errorf("no pack.toml file found, run 'packwiz init' to create one: %w", err)
 			}
-			fmt.Printf("Error loading pack: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error loading pack: %w", err)
 		}
-		var currentLoaders = modpack.GetLoaders()
-		// Do some sanity checks on the current loader slice
+		currentLoaders := modpack.GetLoaders()
 		if len(currentLoaders) == 0 {
-			fmt.Println("No loader is currently set in your pack.toml!")
-			os.Exit(1)
-		} else if len(currentLoaders) > 1 {
-			fmt.Println("You have multiple loaders set in your pack.toml, this is not supported!")
-			os.Exit(1)
+			return fmt.Errorf("no loader is currently set in your pack.toml")
 		}
-		// Get the Minecraft version for the pack
+		if len(currentLoaders) > 1 {
+			return fmt.Errorf("multiple loaders in pack.toml are not supported")
+		}
 		mcVersion, err := modpack.GetMCVersion()
 		if err != nil {
-			fmt.Printf("Error getting Minecraft version: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error getting Minecraft version: %w", err)
 		}
+
 		if args[0] == "latest" || args[0] == "recommended" {
 			fmt.Printf("Updating to %s loader version\n", args[0])
-
 			queryType := core.Latest
 			if args[0] == "recommended" {
 				queryType = core.Recommended
 			}
-
-			// We'll be updating to the latest loader version
 			for _, loader := range currentLoaders {
-				versionData, gottenLoader := getVersionsForLoader(loader, mcVersion, queryType)
+				versionData, gottenLoader, err := getVersionsForLoader(loader, mcVersion, queryType)
+				if err != nil {
+					return err
+				}
 				if !updatePackToVersion(versionData.Latest, modpack, gottenLoader) {
 					continue
 				}
-				// Write the pack to disk
-				err = modpack.Write()
-				if err != nil {
-					fmt.Printf("Error writing pack.toml: %s\n", err)
-					continue
+				if err := modpack.Write(); err != nil {
+					return fmt.Errorf("error writing pack.toml: %w", err)
 				}
 			}
-		} else {
-			fmt.Println("Updating to explicit loader version")
-			// This one is easy :D
-			versionData, loader := getVersionsForLoader(currentLoaders[0], mcVersion, core.Latest)
-			// Check if the loader happens to be Forge/NeoForge, since there's two version formats
-			if loader.Name == "forge" || loader.Name == "neoforge" {
-				wantedVersion := cmdshared.GetRawForgeVersion(args[0])
-				validateVersion(versionData.Versions, wantedVersion, loader)
-				_ = updatePackToVersion(wantedVersion, modpack, loader)
-			} else if loader.Name == "liteloader" {
-				// These are weird and just have a MC version
-				fmt.Println("LiteLoader only has 1 version per Minecraft version so we're unable to update!")
-				os.Exit(0)
-			} else {
-				// We're on Fabric or quilt
-				validateVersion(versionData.Versions, args[0], loader)
-				if ok := updatePackToVersion(args[0], modpack, loader); !ok {
-					os.Exit(1)
-				}
-			}
-			// Write the pack to disk
-			err = modpack.Write()
-			if err != nil {
-				fmt.Printf("Error writing pack.toml: %s\n", err)
-				os.Exit(1)
-			}
+			return nil
 		}
+
+		fmt.Println("Updating to explicit loader version")
+		versionData, loader, err := getVersionsForLoader(currentLoaders[0], mcVersion, core.Latest)
+		if err != nil {
+			return err
+		}
+		if loader.Name == "liteloader" {
+			fmt.Println("LiteLoader only has 1 version per Minecraft version so we're unable to update!")
+			return nil
+		}
+		wantedVersion := args[0]
+		if loader.Name == "forge" || loader.Name == "neoforge" {
+			wantedVersion = cmdshared.GetRawForgeVersion(wantedVersion)
+		}
+		if err := validateVersion(versionData.Versions, wantedVersion, loader); err != nil {
+			return err
+		}
+		if !updatePackToVersion(wantedVersion, modpack, loader) && loader.Name != "forge" && loader.Name != "neoforge" {
+			return fmt.Errorf("%s is already on version %s", loader.FriendlyName, wantedVersion)
+		}
+		if err := modpack.Write(); err != nil {
+			return fmt.Errorf("error writing pack.toml: %w", err)
+		}
+		return nil
 	},
 }
 
@@ -95,34 +85,30 @@ func init() {
 	migrateCmd.AddCommand(loaderCommand)
 }
 
-func getVersionsForLoader(loader, mcVersion string, queryType core.QueryType) (*core.ModLoaderVersions, core.ModLoaderComponent) {
+func getVersionsForLoader(loader, mcVersion string, queryType core.QueryType) (*core.ModLoaderVersions, core.ModLoaderComponent, error) {
 	gottenLoader, ok := core.ModLoaders[loader]
 	if !ok {
-		fmt.Printf("Unknown loader %s\n", loader)
-		os.Exit(1)
+		return nil, core.ModLoaderComponent{}, fmt.Errorf("unknown loader %s", loader)
 	}
 	versionData, err := core.DoQuery(core.MakeQuery(gottenLoader, mcVersion).WithQueryType(queryType))
 	if err != nil {
-		fmt.Printf("Error getting version list for %s: %s\n", gottenLoader.FriendlyName, err)
-		os.Exit(1)
+		return nil, core.ModLoaderComponent{}, fmt.Errorf("error getting version list for %s: %w", gottenLoader.FriendlyName, err)
 	}
-	return versionData, gottenLoader
+	return versionData, gottenLoader, nil
 }
 
-func validateVersion(versions []string, version string, gottenLoader core.ModLoaderComponent) {
+func validateVersion(versions []string, version string, gottenLoader core.ModLoaderComponent) error {
 	if !slices.Contains(versions, version) {
-		fmt.Printf("Version %s is not a valid version for %s\n", version, gottenLoader.FriendlyName)
-		os.Exit(1)
+		return fmt.Errorf("version %s is not valid for %s", version, gottenLoader.FriendlyName)
 	}
+	return nil
 }
 
 func updatePackToVersion(version string, modpack core.Pack, loader core.ModLoaderComponent) bool {
-	// Check if the version is already set
 	if version == modpack.Versions[loader.Name] {
 		fmt.Printf("%s is already on version %s!\n", loader.FriendlyName, version)
 		return false
 	}
-	// Set the latest version
 	modpack.Versions[loader.Name] = version
 	fmt.Printf("Updated %s to version %s\n", loader.FriendlyName, version)
 	return true

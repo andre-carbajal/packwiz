@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/andre-carbajal/packwiz/core"
@@ -20,6 +20,9 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "packwiz",
 	Short: "A command line tool for creating Minecraft modpacks",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return initConfig()
+	},
 }
 
 // Execute starts the root command for packwiz
@@ -35,8 +38,6 @@ func Add(newCommand *cobra.Command) {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	rootCmd.PersistentFlags().StringVar(&packFile, "pack-file", "pack.toml", "The modpack metadata file to use")
 	_ = viper.BindPFlag("pack-file", rootCmd.PersistentFlags().Lookup("pack-file"))
 
@@ -57,21 +58,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&metaFolderBase, "meta-folder-base", ".", "The base folder from which meta-folder will be resolved, defaulting to the current directory (so you can put all mods/etc in a subfolder while still using the default behaviour)")
 	_ = viper.BindPFlag("meta-folder-base", rootCmd.PersistentFlags().Lookup("meta-folder-base"))
 
-	defaultCacheDir, err := core.GetPackwizCache()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	rootCmd.PersistentFlags().String("cache", defaultCacheDir, "The directory where packwiz will cache downloaded mods")
+	rootCmd.PersistentFlags().String("cache", "", "The directory where packwiz will cache downloaded mods (defaults to the user cache directory)")
 	_ = viper.BindPFlag("cache.directory", rootCmd.PersistentFlags().Lookup("cache"))
 
-	file, err := core.GetPackwizLocalStore()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	file = filepath.Join(file, ".packwiz.toml")
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "The config file to use (default \""+file+"\")")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "The config file to use (default: packwiz user config directory)")
 
 	var nonInteractive bool
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "yes", "y", false, "Accept all prompts with the default or \"yes\" option (non-interactive mode) - may pick unwanted options in search results")
@@ -79,15 +69,14 @@ func init() {
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() {
+func initConfig() error {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
 		dir, err := core.GetPackwizLocalStore()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("get config directory: %w", err)
 		}
 
 		viper.AddConfigPath(dir)
@@ -102,5 +91,11 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	} else {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) || cfgFile != "" {
+			return fmt.Errorf("read config file: %w", err)
+		}
 	}
+	return nil
 }

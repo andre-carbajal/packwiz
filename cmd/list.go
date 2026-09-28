@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,35 +17,31 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all the mods in the modpack",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// Load pack
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 
 		// Load index
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 
 		// Load mods
 		mods, err := index.LoadAllMods()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load mod metadata: %w", err)
 		}
 
 		// Filter mods by side
 		if viper.IsSet("list.side") {
 			side := viper.GetString("list.side")
 			if side != core.UniversalSide && side != core.ServerSide && side != core.ClientSide {
-				fmt.Printf("Invalid side %q, must be one of client, server, or both (default)\n", side)
-				os.Exit(1)
+				return fmt.Errorf("invalid side %q, must be one of client, server, or both (default)", side)
 			}
 
 			i := 0
@@ -61,8 +56,7 @@ var listCmd = &cobra.Command{
 
 		mods, err = filterModsByPinStatus(mods, viper.GetBool("list.pinned"), viper.GetBool("list.unpinned"))
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 
 		sort.Slice(mods, func(i, j int) bool {
@@ -73,6 +67,7 @@ var listCmd = &cobra.Command{
 		for _, mod := range mods {
 			fmt.Println(formatListItem(mod, viper.GetBool("list.version"), viper.GetBool("list.slug"), viper.GetBool("list.provider")))
 		}
+		return nil
 	},
 }
 

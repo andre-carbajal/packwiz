@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/andre-carbajal/packwiz/core"
 	"github.com/spf13/viper"
@@ -15,7 +16,7 @@ type ghApiClient struct {
 	httpClient *http.Client
 }
 
-var ghDefaultClient = ghApiClient{&http.Client{}}
+var ghDefaultClient = ghApiClient{&http.Client{Timeout: 30 * time.Second}}
 
 func (c *ghApiClient) makeGet(url string) (*http.Response, error) {
 	ghApiToken := viper.GetString("github.token")

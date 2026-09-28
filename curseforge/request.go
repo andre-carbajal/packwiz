@@ -2,12 +2,13 @@ package curseforge
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -16,25 +17,31 @@ import (
 
 const cfApiServer = "api.curseforge.com"
 
-// If you fork/derive from packwiz, I request that you obtain your own API key.
-const cfApiKeyDefault = "JDJhJDEwJHNBWVhqblU1N0EzSmpzcmJYM3JVdk92UWk2NHBLS3BnQ2VpbGc1TUM1UGNKL0RYTmlGWWxh"
-
-// Exists so you can provide it as a build parameter: -ldflags="-X 'github.com/andre-carbajal/packwiz/curseforge.cfApiKey=key'"
+// Release builds set this with -ldflags. CURSEFORGE_API_KEY in the environment
+// takes precedence when set.
 var cfApiKey = ""
 
-func decodeDefaultKey() string {
-	k, err := base64.StdEncoding.DecodeString(cfApiKeyDefault)
-	if err != nil {
-		panic("failed to read API key!")
+func configuredCFAPIKey() string {
+	if key := os.Getenv("CURSEFORGE_API_KEY"); key != "" {
+		return key
 	}
-	return string(k)
+	return cfApiKey
 }
 
 type cfApiClient struct {
 	httpClient *http.Client
 }
 
-var cfDefaultClient = cfApiClient{&http.Client{}}
+var cfDefaultClient = cfApiClient{&http.Client{Timeout: 30 * time.Second}}
+
+func (c *cfApiClient) setAPIKey(req *http.Request) error {
+	key := configuredCFAPIKey()
+	if key == "" {
+		return errors.New("CurseForge API key is not configured; use an official release build or set CURSEFORGE_API_KEY")
+	}
+	req.Header.Set("X-API-Key", key)
+	return nil
+}
 
 func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", "https://"+cfApiServer+endpoint, nil)
@@ -44,10 +51,9 @@ func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 
 	req.Header.Set("User-Agent", core.UserAgent)
 	req.Header.Set("Accept", "application/json")
-	if cfApiKey == "" {
-		cfApiKey = decodeDefaultKey()
+	if err := c.setAPIKey(req); err != nil {
+		return nil, err
 	}
-	req.Header.Set("X-API-Key", cfApiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -69,10 +75,9 @@ func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response,
 	req.Header.Set("User-Agent", core.UserAgent)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	if cfApiKey == "" {
-		cfApiKey = decodeDefaultKey()
+	if err := c.setAPIKey(req); err != nil {
+		return nil, err
 	}
-	req.Header.Set("X-API-Key", cfApiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

@@ -87,35 +87,24 @@ func (m *Mod) SetMetaPath(metaFile string) string {
 
 // Write saves the mod file, returning a hash format and the value of the hash of the saved file
 func (m Mod) Write() (string, string, error) {
-	f, err := os.Create(m.metaFile)
-	if err != nil {
-		// Attempt to create the containing directory
-		err2 := os.MkdirAll(filepath.Dir(m.metaFile), os.ModePerm)
-		if err2 == nil {
-			f, err = os.Create(m.metaFile)
-		}
-		if err != nil {
-			return "sha256", "", err
-		}
+	// Attempt to create the containing directory, as the previous direct write did.
+	if err := os.MkdirAll(filepath.Dir(m.metaFile), os.ModePerm); err != nil {
+		return "sha256", "", err
 	}
-
 	h, err := GetHashImpl("sha256")
 	if err != nil {
-		_ = f.Close()
 		return "", "", err
 	}
-	w := io.MultiWriter(h, f)
-
-	enc := toml.NewEncoder(w)
-	// Disable indentation
-	enc.Indent = ""
-	err = enc.Encode(m)
-	hashString := h.HashToString(h.Sum(nil))
+	err = atomicWriteFile(m.metaFile, func(w io.Writer) error {
+		enc := toml.NewEncoder(io.MultiWriter(h, w))
+		// Disable indentation
+		enc.Indent = ""
+		return enc.Encode(m)
+	})
 	if err != nil {
-		_ = f.Close()
-		return "sha256", hashString, err
+		return "sha256", "", err
 	}
-	return "sha256", hashString, f.Close()
+	return "sha256", h.HashToString(h.Sum(nil)), nil
 }
 
 // GetParsedUpdateData can be used to retrieve updater-specific information after parsing a mod file

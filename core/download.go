@@ -9,20 +9,33 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"slices"
 )
 
 const UserAgent = "packwiz/packwiz"
 
+var apiHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
+// GetAPIWithUA bounds small metadata/API requests. Downloads use GetWithUA so
+// large mod files can stream without a total request timeout.
+func GetAPIWithUA(url string, contentType string) (resp *http.Response, err error) {
+	return getWithUA(apiHTTPClient, url, contentType)
+}
+
 func GetWithUA(url string, contentType string) (resp *http.Response, err error) {
+	return getWithUA(http.DefaultClient, url, contentType)
+}
+
+func getWithUA(client *http.Client, url string, contentType string) (resp *http.Response, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", contentType)
-	return http.DefaultClient.Do(req)
+	return client.Do(req)
 }
 
 const DownloadCacheImportFolder = "import"

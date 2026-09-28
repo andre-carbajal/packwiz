@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/andre-carbajal/packwiz/cmdshared"
 	"github.com/andre-carbajal/packwiz/core"
@@ -16,20 +15,18 @@ var UpdateCmd = &cobra.Command{
 	Short:   "Update an external file (or all external files) in the modpack",
 	Aliases: []string{"upgrade"},
 	Args:    cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: --check flag?
 		// TODO: specify multiple files to update at once?
 
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 
 		var singleUpdatedName string
@@ -38,8 +35,7 @@ var UpdateCmd = &cobra.Command{
 			fmt.Println("Reading metadata files...")
 			mods, err := index.LoadAllMods()
 			if err != nil {
-				fmt.Printf("Failed to update all files: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to update all files: %w", err)
 			}
 			for _, modData := range mods {
 				updaterFound := false
@@ -96,12 +92,16 @@ var UpdateCmd = &cobra.Command{
 
 			if !updatesFound {
 				fmt.Println("All files are up to date!")
-				return
+				return nil
 			}
 
-			if !cmdshared.PromptYesNo("Do you want to update? [Y/n]: ") {
+			proceed, err := cmdshared.PromptYesNo("Do you want to update? [Y/n]: ")
+			if err != nil {
+				return err
+			}
+			if !proceed {
 				fmt.Println("Cancelled!")
-				return
+				return nil
 			}
 
 			for k, v := range updatableFiles {
@@ -126,22 +126,18 @@ var UpdateCmd = &cobra.Command{
 			}
 		} else {
 			if len(args) < 1 || len(args[0]) == 0 {
-				fmt.Println("Must specify a valid file, or use the --all flag!")
-				os.Exit(1)
+				return fmt.Errorf("must specify a valid file, or use the --all flag")
 			}
 			modPath, ok := index.FindMod(args[0])
 			if !ok {
-				fmt.Println("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-				os.Exit(1)
+				return fmt.Errorf("can't find this file; run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
 			}
 			modData, err := core.LoadMod(modPath)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return fmt.Errorf("failed to load mod metadata: %w", err)
 			}
 			if modData.Pin {
-				fmt.Println("Version is pinned; run the unpin command to allow updating")
-				os.Exit(1)
+				return fmt.Errorf("version is pinned; run the unpin command to allow updating")
 			}
 			singleUpdatedName = modData.Name
 			updaterFound := false
@@ -154,12 +150,10 @@ var UpdateCmd = &cobra.Command{
 
 				check, err := updater.CheckUpdate([]*core.Mod{&modData}, pack)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					return fmt.Errorf("failed to check for updates: %w", err)
 				}
 				if len(check) != 1 {
-					fmt.Println("Invalid update check response")
-					os.Exit(1)
+					return fmt.Errorf("invalid update check response")
 				}
 
 				if check[0].UpdateAvailable {
@@ -167,54 +161,48 @@ var UpdateCmd = &cobra.Command{
 
 					err = updater.DoUpdate([]*core.Mod{&modData}, []any{check[0].CachedState})
 					if err != nil {
-						fmt.Println(err)
-						os.Exit(1)
+						return fmt.Errorf("failed to update mod: %w", err)
 					}
 
 					format, hash, err := modData.Write()
 					if err != nil {
-						fmt.Println(err)
-						os.Exit(1)
+						return fmt.Errorf("failed to write mod metadata: %w", err)
 					}
 					err = index.RefreshFileWithHash(modPath, format, hash, true)
 					if err != nil {
-						fmt.Println(err)
-						os.Exit(1)
+						return err
 					}
 				} else {
 					fmt.Printf("\"%s\" is already up to date!\n", modData.Name)
-					return
+					return nil
 				}
 
 				break
 			}
 			if !updaterFound {
 				// TODO: use file name instead of Name when len(Name) == 0 in all places?
-				fmt.Println("A supported update system for \"" + modData.Name + "\" cannot be found.")
-				os.Exit(1)
+				return fmt.Errorf("a supported update system for %q cannot be found", modData.Name)
 			}
 		}
 
 		err = index.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write index: %w", err)
 		}
 		err = pack.UpdateIndexHash()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to update index hash: %w", err)
 		}
 		err = pack.Write()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to write pack: %w", err)
 		}
 		if viper.GetBool("update.all") {
 			fmt.Println("Files updated!")
 		} else {
 			fmt.Printf("\"%s\" updated!\n", singleUpdatedName)
 		}
+		return nil
 	},
 }
 

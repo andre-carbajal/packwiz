@@ -2,7 +2,6 @@ package curseforge
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/andre-carbajal/packwiz/core"
@@ -16,33 +15,28 @@ var openCmd = &cobra.Command{
 	Short:   "Open the project page for a CurseForge file in your browser",
 	Aliases: []string{"doc"},
 	Args:    cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Loading modpack...")
 		pack, err := core.LoadPack()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load modpack: %w", err)
 		}
 		index, err := pack.LoadIndex()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load index: %w", err)
 		}
 		resolvedMod, ok := index.FindMod(args[0])
 		if !ok {
 			// TODO: should this auto-refresh?
-			fmt.Println("Can't find this file; please ensure you have run packwiz refresh and use the name of the .pw.toml file (defaults to the project slug)")
-			os.Exit(1)
+			return fmt.Errorf("can't find this file; run packwiz refresh and use the .pw.toml filename (defaults to the project slug)")
 		}
 		modData, err := core.LoadMod(resolvedMod)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load mod metadata: %w", err)
 		}
 		updateData, ok := modData.GetParsedUpdateData("curseforge")
 		if !ok {
-			fmt.Println("Can't find CurseForge update metadata for this file")
-			os.Exit(1)
+			return fmt.Errorf("can't find CurseForge update metadata for this file")
 		}
 		cfUpdateData := updateData.(cfUpdateData)
 		fmt.Println("Opening browser...")
@@ -52,6 +46,7 @@ var openCmd = &cobra.Command{
 			fmt.Println("Opening page failed, direct link:")
 			fmt.Println(url)
 		}
+		return nil
 	},
 }
 
