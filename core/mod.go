@@ -13,17 +13,25 @@ import (
 
 // Mod stores metadata about a mod. This is written to a TOML file for each mod.
 type Mod struct {
-	metaFile string      // The file for the metadata file, used as an ID
-	Name     string      `toml:"name"`
-	FileName string      `toml:"filename"`
-	Side     string      `toml:"side,omitempty"`
-	Pin      bool        `toml:"pin,omitempty"`
-	Download ModDownload `toml:"download"`
+	metaFile    string          // The file for the metadata file, used as an ID
+	Name        string          `toml:"name"`
+	FileName    string          `toml:"filename"`
+	Side        string          `toml:"side,omitempty"`
+	Environment *ModEnvironment `toml:"environment,omitempty"`
+	Pin         bool            `toml:"pin,omitempty"`
+	Download    ModDownload     `toml:"download"`
 	// Update is a map of map of stuff, so you can store arbitrary values on string keys to define updating
 	Update     map[string]map[string]any `toml:"update"`
 	updateData map[string]any
 
 	Option *ModOption `toml:"option,omitempty"`
+}
+
+// ModEnvironment stores exact client/server environment requirements for formats
+// that can express different requirements on each side.
+type ModEnvironment struct {
+	Client string `toml:"client" json:"client"`
+	Server string `toml:"server" json:"server"`
 }
 
 const (

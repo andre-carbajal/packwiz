@@ -91,6 +91,10 @@ var exportCmd = &cobra.Command{
 
 		manifestFiles := make([]PackFile, 0)
 		for dl := range session.StartDownloads() {
+			env := getModrinthEnvironment(dl.Mod)
+			if err := validatePackEnvironment(env); err != nil {
+				return fmt.Errorf("invalid environment for %s: %w", dl.Mod.Name, err)
+			}
 			if canBeIncludedDirectly(dl.Mod, restrictDomains) {
 				if dl.Error != nil {
 					return fmt.Errorf("download of %s (%s) failed: %w", dl.Mod.Name, dl.Mod.FileName, dl.Error)
@@ -112,25 +116,6 @@ var exportCmd = &cobra.Command{
 					return fmt.Errorf("invalid download size for %s: %w", dl.Mod.Name, err)
 				}
 
-				// Create env options based on configured optional/side
-				var envInstalled string
-				if dl.Mod.Option != nil && dl.Mod.Option.Optional {
-					envInstalled = "optional"
-				} else {
-					envInstalled = "required"
-				}
-				var clientEnv, serverEnv string
-				if dl.Mod.Side == core.UniversalSide || dl.Mod.Side == core.EmptySide {
-					clientEnv = envInstalled
-					serverEnv = envInstalled
-				} else if dl.Mod.Side == core.ClientSide {
-					clientEnv = envInstalled
-					serverEnv = "unsupported"
-				} else if dl.Mod.Side == core.ServerSide {
-					clientEnv = "unsupported"
-					serverEnv = envInstalled
-				}
-
 				// Modrinth URLs must be RFC3986
 				u, err := core.ReencodeURL(dl.Mod.Download.URL)
 				if err != nil {
@@ -138,26 +123,19 @@ var exportCmd = &cobra.Command{
 				}
 
 				manifestFiles = append(manifestFiles, PackFile{
-					Path:   path,
-					Hashes: hashes,
-					Env: &struct {
-						Client string `json:"client"`
-						Server string `json:"server"`
-					}{Client: clientEnv, Server: serverEnv},
+					Path:      path,
+					Hashes:    hashes,
+					Env:       env,
 					Downloads: []string{u},
 					FileSize:  uint32(fileSize),
 				})
 
 				fmt.Printf("%s (%s) added to manifest\n", dl.Mod.Name, dl.Mod.FileName)
 			} else {
-				var zipDir string
-				if dl.Mod.Side == core.ClientSide {
-					zipDir = "client-overrides"
-				} else if dl.Mod.Side == core.ServerSide {
-					zipDir = "server-overrides"
-				} else {
-					zipDir = "overrides"
+				if dl.Mod.Environment != nil && (env.Client == "optional" || env.Server == "optional" || (env.Client == "unsupported" && env.Server == "unsupported")) {
+					return fmt.Errorf("cannot bundle %s into overrides without losing its Modrinth environment; allow its download domain with --restrictDomains=false", dl.Mod.Name)
 				}
+				zipDir := modrinthOverrideDir(dl.Mod)
 				if err := cmdshared.AddToZip(dl, exp, zipDir, &index); err != nil {
 					return err
 				}
@@ -214,7 +192,7 @@ var exportCmd = &cobra.Command{
 			return fmt.Errorf("error writing manifest: %w", err)
 		}
 
-		if err := cmdshared.AddNonMetafileOverrides(&index, exp); err != nil {
+		if err := cmdshared.AddModrinthOverrides(&index, exp); err != nil {
 			return err
 		}
 
@@ -230,6 +208,36 @@ var exportCmd = &cobra.Command{
 		fmt.Println("Modpack exported to " + expFile.Name())
 		return nil
 	},
+}
+
+func getModrinthEnvironment(mod *core.Mod) *PackEnvironment {
+	if mod.Environment != nil {
+		return &PackEnvironment{Client: mod.Environment.Client, Server: mod.Environment.Server}
+	}
+
+	installed := "required"
+	if mod.Option != nil && mod.Option.Optional {
+		installed = "optional"
+	}
+	client, server := installed, installed
+	switch mod.Side {
+	case core.ClientSide:
+		server = "unsupported"
+	case core.ServerSide:
+		client = "unsupported"
+	}
+	return &PackEnvironment{Client: client, Server: server}
+}
+
+func modrinthOverrideDir(mod *core.Mod) string {
+	env := getModrinthEnvironment(mod)
+	if env.Client == "unsupported" && env.Server != "unsupported" {
+		return "server-overrides"
+	}
+	if env.Server == "unsupported" && env.Client != "unsupported" {
+		return "client-overrides"
+	}
+	return "overrides"
 }
 
 var whitelistedHosts = []string{

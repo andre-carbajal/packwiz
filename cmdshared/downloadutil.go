@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/andre-carbajal/packwiz/core"
 )
@@ -62,12 +63,30 @@ func AddToZip(dl core.CompletedDownload, exp *zip.Writer, dir string, index *cor
 
 // AddNonMetafileOverrides saves all non-metadata files into an overrides folder in the zip
 func AddNonMetafileOverrides(index *core.Index, exp *zip.Writer) error {
+	return addNonMetafileOverrides(index, exp, false)
+}
+
+// AddModrinthOverrides also restores Modrinth's client/server override layers
+// stored under .packwiz-mrpack in the source pack.
+func AddModrinthOverrides(index *core.Index, exp *zip.Writer) error {
+	return addNonMetafileOverrides(index, exp, true)
+}
+
+func addNonMetafileOverrides(index *core.Index, exp *zip.Writer, modrinthLayers bool) error {
+	written := make(map[string]struct{})
 	for p, v := range index.Files {
 		if v.IsMetaFile() {
 			continue
 		}
 		for _, aliasPath := range v.AliasPaths() {
-			file, err := exp.Create(path.Join("overrides", aliasPath))
+			if aliasPath == core.MRPackOverrideStorageDir || strings.HasPrefix(aliasPath, core.MRPackOverrideStorageDir+"/") {
+				continue
+			}
+			archivePath := path.Join("overrides", aliasPath)
+			if _, duplicate := written[archivePath]; duplicate {
+				continue
+			}
+			file, err := exp.Create(archivePath)
 			if err != nil {
 				return fmt.Errorf("error creating override %s: %w", aliasPath, err)
 			}
@@ -85,6 +104,75 @@ func AddNonMetafileOverrides(index *core.Index, exp *zip.Writer) error {
 			if err := src.Close(); err != nil {
 				return fmt.Errorf("error closing override %s: %w", p, err)
 			}
+			written[archivePath] = struct{}{}
+		}
+	}
+	return addStoredMRPackOverrides(index, exp, modrinthLayers, written)
+}
+
+func addStoredMRPackOverrides(index *core.Index, exp *zip.Writer, modrinthLayers bool, written map[string]struct{}) error {
+	root := index.ResolveIndexPath(".")
+	for _, layer := range []string{"client-overrides", "server-overrides"} {
+		storedRoot := filepath.Join(root, core.MRPackOverrideStorageDir, layer)
+		info, err := os.Lstat(storedRoot)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("check stored %s: %w", layer, err)
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("stored %s path is not a directory", layer)
+		}
+		err = filepath.WalkDir(storedRoot, func(filePath string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if filePath == storedRoot || entry.IsDir() {
+				return nil
+			}
+			if entry.Type()&os.ModeSymlink != 0 {
+				return fmt.Errorf("stored override %q is a symlink", filePath)
+			}
+			fileInfo, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			if !fileInfo.Mode().IsRegular() {
+				return fmt.Errorf("stored override %q is not a regular file", filePath)
+			}
+			relative, err := filepath.Rel(storedRoot, filePath)
+			if err != nil {
+				return err
+			}
+			relative = filepath.ToSlash(relative)
+			archivePath := path.Join("overrides", relative)
+			if modrinthLayers {
+				archivePath = path.Join(layer, relative)
+			}
+			if _, duplicate := written[archivePath]; duplicate {
+				return nil
+			}
+			output, err := exp.Create(archivePath)
+			if err != nil {
+				return fmt.Errorf("error creating override %s: %w", archivePath, err)
+			}
+			source, err := os.Open(filePath)
+			if err != nil {
+				return fmt.Errorf("error reading override %s: %w", filePath, err)
+			}
+			if _, err := io.Copy(output, source); err != nil {
+				_ = source.Close()
+				return fmt.Errorf("error copying override %s: %w", filePath, err)
+			}
+			if err := source.Close(); err != nil {
+				return fmt.Errorf("error closing override %s: %w", filePath, err)
+			}
+			written[archivePath] = struct{}{}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("read stored %s overrides: %w", layer, err)
 		}
 	}
 	return nil

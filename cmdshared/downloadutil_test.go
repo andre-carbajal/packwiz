@@ -21,6 +21,13 @@ func TestAddNonMetafileOverridesExportsAllAliases(t *testing.T) {
 	if err := os.WriteFile(source, []byte(contents), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	storedLayerFile := filepath.Join(root, core.MRPackOverrideStorageDir, "client-overrides", "config", "client.cfg")
+	if err := os.MkdirAll(filepath.Dir(storedLayerFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(storedLayerFile, []byte("client layer"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	indexPath := filepath.Join(root, "index.toml")
 	indexData := `hash-format = "sha256"
@@ -69,8 +76,9 @@ alias = "alt/dual.jar"
 	}
 
 	want := map[string]string{
-		"overrides/mods/dual.jar": contents,
-		"overrides/alt/dual.jar":  contents,
+		"overrides/mods/dual.jar":     contents,
+		"overrides/alt/dual.jar":      contents,
+		"overrides/config/client.cfg": "client layer",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d archive files, want %d: %v", len(got), len(want), got)

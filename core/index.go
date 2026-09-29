@@ -187,6 +187,13 @@ func (in *Index) Refresh() error {
 		if path == in.packRoot {
 			return nil
 		}
+		// These source-only files are re-emitted by Modrinth export, not installed.
+		if filepath.Clean(path) == filepath.Join(in.packRoot, MRPackOverrideStorageDir) {
+			if info.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 
 		if info.IsDir() {
 			// Don't traverse ignored directories (consistent with Git handling of ignored dirs)

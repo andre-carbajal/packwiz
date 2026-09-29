@@ -5,3 +5,6 @@ package core
 const MetaExtension = ".pw.toml"
 
 const MetaExtensionOld = ".toml"
+
+// MRPackOverrideStorageDir holds Modrinth-specific override layers for re-export.
+const MRPackOverrideStorageDir = ".packwiz-mrpack"

@@ -86,7 +86,11 @@ func TestLoadMod_WriteRoundTrip(t *testing.T) {
 		Name:     "Sodium",
 		FileName: "sodium-fabric-mc1.20.1-0.5.3.jar",
 		Side:     "client",
-		Pin:      true,
+		Environment: &ModEnvironment{
+			Client: "optional",
+			Server: "required",
+		},
+		Pin: true,
 		Download: ModDownload{
 			URL:        "https://cdn.modrinth.com/data/AANobbMI/versions/sodium-fabric.jar",
 			HashFormat: "sha512",
@@ -125,6 +129,10 @@ func TestLoadMod_WriteRoundTrip(t *testing.T) {
 
 	if loaded.Side != original.Side {
 		t.Errorf("Side = %q, want %q", loaded.Side, original.Side)
+	}
+
+	if loaded.Environment == nil || *loaded.Environment != *original.Environment {
+		t.Errorf("Environment = %+v, want %+v", loaded.Environment, original.Environment)
 	}
 
 	if loaded.Pin != original.Pin {

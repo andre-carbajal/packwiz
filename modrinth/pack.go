@@ -11,12 +11,14 @@ type Pack struct {
 }
 
 type PackFile struct {
-	Path   string            `json:"path"`
-	Hashes map[string]string `json:"hashes"`
-	Env    *struct {
-		Client string `json:"client"`
-		Server string `json:"server"`
-	} `json:"env"`
-	Downloads []string `json:"downloads"`
-	FileSize  uint32   `json:"fileSize"`
+	Path      string            `json:"path"`
+	Hashes    map[string]string `json:"hashes"`
+	Env       *PackEnvironment  `json:"env"`
+	Downloads []string          `json:"downloads"`
+	FileSize  uint32            `json:"fileSize"`
+}
+
+type PackEnvironment struct {
+	Client string `json:"client"`
+	Server string `json:"server"`
 }

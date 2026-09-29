@@ -19,7 +19,7 @@ Join my Discord server if you need help [here](https://discord.gg/Csh8zbbhCt)!
 - Pack distribution with HTTP servers, with a built in local server for testing
 - Easy installation and updating of multiple mods at once from CurseForge and Modrinth
 - Exporting to CurseForge and Modrinth packs
-- Importing from CurseForge packs
+- Importing from CurseForge and Modrinth packs
 - Server-only and Client-only mod handling
 - Creation of remote file metadata from JAR files for CurseForge mods
 

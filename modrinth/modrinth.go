@@ -143,7 +143,7 @@ var loaderCompatGroups = map[string][]string{
 
 func getProjectTypeFolder(projectType string, fileLoaders []string, packLoaders []string) (string, error) {
 	if projectType == "modpack" {
-		return "", errors.New("this command should not be used to add Modrinth modpacks, and importing of Modrinth modpacks is not yet supported")
+		return "", errors.New("this command should not be used to add Modrinth modpacks")
 	} else if projectType == "resourcepack" {
 		return "resourcepacks", nil
 	} else if projectType == "shader" {
