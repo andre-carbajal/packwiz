@@ -236,7 +236,7 @@ func (pack Pack) GetLoaders() (loaders []string) {
 	return
 }
 
-func (pack Pack) CreateExportFile(fileName string, defaultFileExt string) (*os.File, error) {
+func (pack Pack) exportFilePath(fileName string, defaultFileExt string) (string, error) {
 	if fileName == "" {
 		fileName = pack.GetPackName() + defaultFileExt
 	} else {
@@ -244,15 +244,39 @@ func (pack Pack) CreateExportFile(fileName string, defaultFileExt string) (*os.F
 		if info, err := os.Stat(fileName); err == nil {
 			isDirectory = info.IsDir()
 		} else if !os.IsNotExist(err) {
-			return nil, err
+			return "", err
 		}
 		if isDirectory {
 			fileName = filepath.Join(fileName, pack.GetPackName()+defaultFileExt)
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(fileName), 0o755); err != nil {
+	return fileName, nil
+}
+
+func (pack Pack) CreateExportFile(fileName string, defaultFileExt string) (*os.File, error) {
+	path, err := pack.exportFilePath(fileName, defaultFileExt)
+	if err != nil {
 		return nil, err
 	}
-	return os.Create(fileName)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	return os.Create(path)
+}
+
+// WriteExportFile preserves existing output on every failure, not just preflight
+// errors. It shares filename resolution with CreateExportFile.
+func (pack Pack) WriteExportFile(fileName, defaultFileExt string, write func(io.Writer) error) (string, error) {
+	path, err := pack.exportFilePath(fileName, defaultFileExt)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	if err := atomicWriteFile(path, write); err != nil {
+		return "", err
+	}
+	return path, nil
 }

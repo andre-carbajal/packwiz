@@ -207,22 +207,14 @@ func createModFile(modInfo modInfo, fileInfo modFileInfo, index *core.Index, opt
 			Hash:       hash,
 			Mode:       core.ModeCF,
 		},
-		Option: optional,
-		Update: updateMap,
+		Option:       optional,
+		Update:       updateMap,
+		UpdateSource: "curseforge",
 	}
-	path := modMeta.SetMetaPath(getPathForFile(modInfo.GameID, modInfo.ClassID, modInfo.PrimaryCategoryID, modInfo.Slug))
+	modMeta.SetMetaPath(getPathForFile(modInfo.GameID, modInfo.ClassID, modInfo.PrimaryCategoryID, modInfo.Slug))
 
-	// If the file already exists, this will overwrite it!!!
-	// TODO: Should this be improved?
-	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
-	// VCS anyway.
-
-	format, hash, err := modMeta.Write()
-	if err != nil {
-		return err
-	}
-
-	return index.RefreshFileWithHash(path, format, hash, true)
+	core.AutoLinkMod(&modMeta)
+	return core.WriteInstalledMod(&modMeta, index)
 }
 
 func getSearchLoaderType(pack core.Pack) modloaderType {
@@ -469,6 +461,7 @@ func (u cfUpdater) DoUpdate(mods []*core.Mod, cachedState []any) error {
 
 		v.Update["curseforge"]["project-id"] = modState.ID
 		v.Update["curseforge"]["file-id"] = fileInfoData.ID
+		core.ResetSecondaryReferences(v, "curseforge")
 	}
 
 	return nil

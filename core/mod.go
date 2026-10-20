@@ -13,13 +13,14 @@ import (
 
 // Mod stores metadata about a mod. This is written to a TOML file for each mod.
 type Mod struct {
-	metaFile    string          // The file for the metadata file, used as an ID
-	Name        string          `toml:"name"`
-	FileName    string          `toml:"filename"`
-	Side        string          `toml:"side,omitempty"`
-	Environment *ModEnvironment `toml:"environment,omitempty"`
-	Pin         bool            `toml:"pin,omitempty"`
-	Download    ModDownload     `toml:"download"`
+	metaFile     string          // The file for the metadata file, used as an ID
+	Name         string          `toml:"name"`
+	FileName     string          `toml:"filename"`
+	Side         string          `toml:"side,omitempty"`
+	Environment  *ModEnvironment `toml:"environment,omitempty"`
+	Pin          bool            `toml:"pin,omitempty"`
+	UpdateSource string          `toml:"update-source,omitempty"`
+	Download     ModDownload     `toml:"download"`
 	// Update is a map of map of stuff, so you can store arbitrary values on string keys to define updating
 	Update     map[string]map[string]any `toml:"update"`
 	updateData map[string]any
@@ -69,6 +70,15 @@ func LoadMod(modFile string) (Mod, error) {
 	if _, err := toml.DecodeFile(modFile, &mod); err != nil {
 		return Mod{}, err
 	}
+	if err := mod.ParseUpdateData(); err != nil {
+		return mod, err
+	}
+	mod.metaFile = modFile
+	return mod, nil
+}
+
+// ParseUpdateData refreshes parsed metadata after an in-memory update or link.
+func (mod *Mod) ParseUpdateData() error {
 	mod.updateData = make(map[string]any)
 	// Horrible reflection library to convert map[string]interface to proper struct
 	for k, v := range mod.Update {
@@ -76,15 +86,14 @@ func LoadMod(modFile string) (Mod, error) {
 		if ok {
 			updateData, err := updater.ParseUpdate(v)
 			if err != nil {
-				return mod, err
+				return err
 			}
 			mod.updateData[k] = updateData
 		} else {
-			return mod, errors.New("Update plugin " + k + " not found!")
+			return errors.New("Update plugin " + k + " not found!")
 		}
 	}
-	mod.metaFile = modFile
-	return mod, nil
+	return nil
 }
 
 // SetMetaPath sets the file path of a metadata file

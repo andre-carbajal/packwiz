@@ -23,6 +23,50 @@ Join my Discord server if you need help [here](https://discord.gg/Csh8zbbhCt)!
 - Server-only and Client-only mod handling
 - Creation of remote file metadata from JAR files for CurseForge mods
 
+## Linking CurseForge and Modrinth
+
+Adding a mod (including dependencies) automatically looks for **identical file
+contents** on the other platform. One `.pw.toml` stores both references; names
+and version numbers are never used to infer a match. Failed or ambiguous
+secondary lookups warn without cancelling the primary installation.
+
+Complete existing packs or select a specific project/file manually:
+
+```sh
+packwiz link --all
+packwiz link sodium
+packwiz link sodium --curseforge https://www.curseforge.com/minecraft/mc-mods/sodium/files/FILE_ID
+packwiz link sodium --modrinth https://modrinth.com/mod/sodium/version/VERSION_ID
+```
+
+Manual links also require identical contents and preserve the metadata path,
+download configuration, optional settings, environments and pin. `link --all`
+keeps successful links and reports failures with a nonzero exit status. Linking
+may download files into the existing packwiz cache; fingerprint-only files must
+be downloaded from their origin to prove byte identity.
+
+The root `update-source` field selects one primary updater (`curseforge` or
+`modrinth`). Legacy metadata infers it from its sole updater or its download
+mode/Modrinth CDN URL; ambiguous metadata needs an explicit value. Updating
+invalidates old secondary references and searches again for the updated file.
+
+CurseForge exports use native manifest references; Modrinth exports use native
+Modrinth URLs for linked files without changing the installed download source.
+Both exports fail by default if a managed file has no destination reference:
+
+```sh
+packwiz curseforge export
+packwiz modrinth export
+# Explicitly permit the previous external-file behavior:
+packwiz curseforge export --allow-overrides
+packwiz modrinth export --allow-overrides
+```
+
+Local configuration/resource overrides are unaffected. `--allow-overrides`
+does not guarantee platform approval. Failed exports preserve existing output
+files. Local builds require `CURSEFORGE_API_KEY` for CurseForge lookups, including
+automatic links from Modrinth (see below).
+
 ## Installation
 Stable prebuilt binaries are available from [GitHub Releases](https://github.com/andre-carbajal/packwiz/releases/latest).
 

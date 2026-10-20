@@ -425,9 +425,9 @@ func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, 
 			HashFormat: algorithm,
 			Hash:       hash,
 		},
-		Update: updateMap,
+		Update:       updateMap,
+		UpdateSource: "modrinth",
 	}
-	var path string
 	folder := viper.GetString("meta-folder")
 	if folder == "" {
 		folder, err = getProjectTypeFolder(*project.ProjectType, version.Loaders, pack.GetCompatibleLoaders())
@@ -436,21 +436,13 @@ func createFileMeta(project *modrinthApi.Project, version *modrinthApi.Version, 
 		}
 	}
 	if project.Slug != nil {
-		path = modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), folder, *project.Slug+core.MetaExtension))
+		modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), folder, *project.Slug+core.MetaExtension))
 	} else {
-		path = modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), folder, core.SlugifyName(*project.Title)+core.MetaExtension))
+		modMeta.SetMetaPath(filepath.Join(viper.GetString("meta-folder-base"), folder, core.SlugifyName(*project.Title)+core.MetaExtension))
 	}
 
-	// If the file already exists, this will overwrite it!!!
-	// TODO: Should this be improved?
-	// Current strategy is to go ahead and do stuff without asking, with the assumption that you are using
-	// VCS anyway.
-
-	format, hash, err := modMeta.Write()
-	if err != nil {
-		return err
-	}
-	return index.RefreshFileWithHash(path, format, hash, true)
+	core.AutoLinkMod(&modMeta)
+	return core.WriteInstalledMod(&modMeta, index)
 }
 
 var projectIDFlag string

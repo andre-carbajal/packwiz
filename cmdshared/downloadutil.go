@@ -182,9 +182,9 @@ func PrintDisclaimer(isCf bool) {
 	fmt.Println("Disclaimer: you are responsible for ensuring you comply with ALL the licenses, or obtain appropriate permissions, for the files \"added to zip\" below")
 	if isCf {
 		fmt.Println("Note that mods bundled within a CurseForge pack must be in the Approved Non-CurseForge Mods list")
-		fmt.Println("packwiz is currently unable to match metadata between mod sites - if any of these are available from CurseForge you should change them to use CurseForge metadata (e.g. by re-adding them using the cf commands)")
+		fmt.Println("Use packwiz link --all to associate identical files hosted on CurseForge.")
 	} else {
-		fmt.Println("packwiz is currently unable to match metadata between mod sites - if any of these are available from Modrinth you should change them to use Modrinth metadata (e.g. by re-adding them using the mr commands)")
+		fmt.Println("Use packwiz link --all to associate identical files hosted on Modrinth.")
 	}
 	fmt.Println()
 }

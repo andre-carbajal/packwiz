@@ -127,6 +127,7 @@ func (u mrUpdater) DoUpdate(mods []*core.Mod, cachedState []any) error {
 			Hash:       hash,
 		}
 		mod.Update["modrinth"]["version"] = version.ID
+		core.ResetSecondaryReferences(mod, "modrinth")
 	}
 
 	return nil

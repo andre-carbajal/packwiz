@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/andre-carbajal/packwiz/cmdshared"
@@ -67,6 +68,11 @@ var exportCmd = &cobra.Command{
 		}
 		mods = mods[:i]
 
+		allowOverrides := viper.GetBool("curseforge.export.allow-overrides")
+		if err := core.ValidatePlatformReferences(mods, "curseforge", allowOverrides); err != nil {
+			return err
+		}
+
 		var exportData cfExportData
 		exportDataUnparsed, ok := pack.Export["curseforge"]
 		if ok {
@@ -76,92 +82,88 @@ var exportCmd = &cobra.Command{
 			}
 		}
 
-		expFile, err := pack.CreateExportFile(viper.GetString("curseforge.export.output"), ".zip")
-		if err != nil {
-			return fmt.Errorf("failed to create zip: %w", err)
-		}
-		defer expFile.Close()
-		exp := zip.NewWriter(expFile)
-		defer exp.Close()
+		exportPath, err := pack.WriteExportFile(viper.GetString("curseforge.export.output"), ".zip", func(writer io.Writer) error {
+			exp := zip.NewWriter(writer)
+			defer exp.Close()
 
-		// Add an overrides folder even if there are no files to go in it
-		_, err = exp.Create("overrides/")
-		if err != nil {
-			return fmt.Errorf("failed to add overrides folder: %w", err)
-		}
-
-		cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
-		nonCfMods := make([]*core.Mod, 0)
-		for _, mod := range mods {
-			projectRaw, ok := mod.GetParsedUpdateData("curseforge")
-			// If the mod has curseforge metadata, add it to cfFileRefs
-			if ok {
-				p := projectRaw.(cfUpdateData)
-				cfFileRefs = append(cfFileRefs, packinterop.AddonFileReference{
-					ProjectID:        p.ProjectID,
-					FileID:           p.FileID,
-					OptionalDisabled: mod.Option != nil && mod.Option.Optional && !mod.Option.Default,
-				})
-			} else {
-				nonCfMods = append(nonCfMods, mod)
-			}
-		}
-
-		// Download external files and save directly into the zip
-		if len(nonCfMods) > 0 {
-			fmt.Printf("Retrieving %v external files to store in the modpack zip...\n", len(nonCfMods))
-			cmdshared.PrintDisclaimer(true)
-
-			session, err := core.CreateDownloadSession(nonCfMods, []string{})
+			// Add an overrides folder even if there are no files to go in it
+			_, err = exp.Create("overrides/")
 			if err != nil {
-				return fmt.Errorf("error retrieving external files: %w", err)
+				return fmt.Errorf("failed to add overrides folder: %w", err)
 			}
 
-			if err := cmdshared.ListManualDownloads(session); err != nil {
-				return err
-			}
-
-			for dl := range session.StartDownloads() {
-				if err := cmdshared.AddToZip(dl, exp, "overrides", &index); err != nil {
-					return err
+			cfFileRefs := make([]packinterop.AddonFileReference, 0, len(mods))
+			nonCfMods := make([]*core.Mod, 0)
+			for _, mod := range mods {
+				projectRaw, ok := mod.GetParsedUpdateData("curseforge")
+				// If the mod has curseforge metadata, add it to cfFileRefs
+				if ok {
+					p := projectRaw.(cfUpdateData)
+					cfFileRefs = append(cfFileRefs, packinterop.AddonFileReference{
+						ProjectID:        p.ProjectID,
+						FileID:           p.FileID,
+						OptionalDisabled: mod.Option != nil && mod.Option.Optional && !mod.Option.Default,
+					})
+				} else {
+					nonCfMods = append(nonCfMods, mod)
 				}
 			}
 
-			err = session.SaveIndex()
-			if err != nil {
-				return fmt.Errorf("error saving cache index: %w", err)
+			// Download external files and save directly into the zip
+			if len(nonCfMods) > 0 {
+				fmt.Printf("Retrieving %v external files to store in the modpack zip...\n", len(nonCfMods))
+				cmdshared.PrintDisclaimer(true)
+
+				session, err := core.CreateDownloadSession(nonCfMods, []string{})
+				if err != nil {
+					return fmt.Errorf("error retrieving external files: %w", err)
+				}
+
+				if err := cmdshared.ListManualDownloads(session); err != nil {
+					return err
+				}
+
+				for dl := range session.StartDownloads() {
+					if err := cmdshared.AddToZip(dl, exp, "overrides", &index); err != nil {
+						return err
+					}
+				}
+
+				err = session.SaveIndex()
+				if err != nil {
+					return fmt.Errorf("error saving cache index: %w", err)
+				}
 			}
-		}
 
-		manifestFile, err := exp.Create("manifest.json")
+			manifestFile, err := exp.Create("manifest.json")
+			if err != nil {
+				return fmt.Errorf("error creating manifest: %w", err)
+			}
+
+			err = packinterop.WriteManifestFromPack(pack, cfFileRefs, exportData.ProjectID, manifestFile)
+			if err != nil {
+				return fmt.Errorf("error writing manifest: %w", err)
+			}
+
+			err = createModlist(exp, mods)
+			if err != nil {
+				return fmt.Errorf("error creating mod list: %w", err)
+			}
+
+			if err := cmdshared.AddNonMetafileOverrides(&index, exp); err != nil {
+				return err
+			}
+
+			err = exp.Close()
+			if err != nil {
+				return fmt.Errorf("error writing export file: %w", err)
+			}
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("error creating manifest: %w", err)
-		}
-
-		err = packinterop.WriteManifestFromPack(pack, cfFileRefs, exportData.ProjectID, manifestFile)
-		if err != nil {
-			return fmt.Errorf("error writing manifest: %w", err)
-		}
-
-		err = createModlist(exp, mods)
-		if err != nil {
-			return fmt.Errorf("error creating mod list: %w", err)
-		}
-
-		if err := cmdshared.AddNonMetafileOverrides(&index, exp); err != nil {
 			return err
 		}
-
-		err = exp.Close()
-		if err != nil {
-			return fmt.Errorf("error writing export file: %w", err)
-		}
-		err = expFile.Close()
-		if err != nil {
-			return fmt.Errorf("error writing export file: %w", err)
-		}
-
-		fmt.Println("Modpack exported to " + expFile.Name())
+		fmt.Println("Modpack exported to " + exportPath)
 		return nil
 	},
 }
@@ -204,6 +206,8 @@ func createModlist(zw *zip.Writer, mods []*core.Mod) error {
 
 func init() {
 	curseforgeCmd.AddCommand(exportCmd)
+	exportCmd.Flags().Bool("allow-overrides", false, "Allow files without CurseForge references (may be rejected)")
+	_ = viper.BindPFlag("curseforge.export.allow-overrides", exportCmd.Flags().Lookup("allow-overrides"))
 
 	exportCmd.Flags().StringP("side", "s", "client", "The side to export mods with")
 	_ = viper.BindPFlag("curseforge.export.side", exportCmd.Flags().Lookup("side"))

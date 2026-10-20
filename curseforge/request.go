@@ -60,8 +60,8 @@ func (c *cfApiClient) makeGet(endpoint string) (*http.Response, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("invalid response status: %v", resp.Status)
+	if err := cfResponseError(resp); err != nil {
+		return nil, err
 	}
 	return resp, nil
 }
@@ -84,10 +84,21 @@ func (c *cfApiClient) makePost(endpoint string, body io.Reader) (*http.Response,
 		return nil, err
 	}
 
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("invalid response status: %v", resp.Status)
+	if err := cfResponseError(resp); err != nil {
+		return nil, err
 	}
 	return resp, nil
+}
+
+func cfResponseError(resp *http.Response) error {
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return &core.PlatformAuthError{Platform: "CurseForge"}
+	}
+	return fmt.Errorf("invalid response status: %v", resp.Status)
 }
 
 type fileType uint8

@@ -38,22 +38,15 @@ var UpdateCmd = &cobra.Command{
 				return fmt.Errorf("failed to update all files: %w", err)
 			}
 			for _, modData := range mods {
-				updaterFound := false
-				for k := range modData.Update {
-					slice, ok := filesWithUpdater[k]
-					if !ok {
-						_, ok = core.Updaters[k]
-						if !ok {
-							continue
-						}
-						slice = []*core.Mod{}
-					}
-					updaterFound = true
-					filesWithUpdater[k] = append(slice, modData)
+				if len(modData.Update) == 0 {
+					fmt.Printf("A supported update system for %q cannot be found.\n", modData.Name)
+					continue
 				}
-				if !updaterFound {
-					fmt.Printf("A supported update system for \"%s\" cannot be found.\n", modData.Name)
+				source, err := modData.PrimaryUpdateSource()
+				if err != nil {
+					return err
 				}
+				filesWithUpdater[source] = append(filesWithUpdater[source], modData)
 			}
 
 			fmt.Println("Checking for updates...")
@@ -140,49 +133,41 @@ var UpdateCmd = &cobra.Command{
 				return fmt.Errorf("version is pinned; run the unpin command to allow updating")
 			}
 			singleUpdatedName = modData.Name
-			updaterFound := false
-			for k := range modData.Update {
-				updater, ok := core.Updaters[k]
-				if !ok {
-					continue
-				}
-				updaterFound = true
+			source, err := modData.PrimaryUpdateSource()
+			if err != nil {
+				return err
+			}
+			updater := core.Updaters[source]
 
-				check, err := updater.CheckUpdate([]*core.Mod{&modData}, pack)
+			check, err := updater.CheckUpdate([]*core.Mod{&modData}, pack)
+			if err != nil {
+				return fmt.Errorf("failed to check for updates: %w", err)
+			}
+			if len(check) != 1 {
+				return fmt.Errorf("invalid update check response")
+			}
+
+			if check[0].UpdateAvailable {
+				fmt.Printf("Update available: %s\n", check[0].UpdateString)
+
+				err = updater.DoUpdate([]*core.Mod{&modData}, []any{check[0].CachedState})
 				if err != nil {
-					return fmt.Errorf("failed to check for updates: %w", err)
-				}
-				if len(check) != 1 {
-					return fmt.Errorf("invalid update check response")
+					return fmt.Errorf("failed to update mod: %w", err)
 				}
 
-				if check[0].UpdateAvailable {
-					fmt.Printf("Update available: %s\n", check[0].UpdateString)
-
-					err = updater.DoUpdate([]*core.Mod{&modData}, []any{check[0].CachedState})
-					if err != nil {
-						return fmt.Errorf("failed to update mod: %w", err)
-					}
-
-					format, hash, err := modData.Write()
-					if err != nil {
-						return fmt.Errorf("failed to write mod metadata: %w", err)
-					}
-					err = index.RefreshFileWithHash(modPath, format, hash, true)
-					if err != nil {
-						return err
-					}
-				} else {
-					fmt.Printf("\"%s\" is already up to date!\n", modData.Name)
-					return nil
+				format, hash, err := modData.Write()
+				if err != nil {
+					return fmt.Errorf("failed to write mod metadata: %w", err)
 				}
-
-				break
+				err = index.RefreshFileWithHash(modPath, format, hash, true)
+				if err != nil {
+					return err
+				}
+			} else {
+				fmt.Printf("\"%s\" is already up to date!\n", modData.Name)
+				return nil
 			}
-			if !updaterFound {
-				// TODO: use file name instead of Name when len(Name) == 0 in all places?
-				return fmt.Errorf("a supported update system for %q cannot be found", modData.Name)
-			}
+
 		}
 
 		err = index.Write()
