@@ -1,5 +1,7 @@
 # packwiz
 
+**This repository is a fork of the original [`packwiz/packwiz`](https://github.com/packwiz/packwiz) project.**
+
 **packwiz is a command-line tool for creating and maintaining Minecraft modpacks.** It stores pack information as TOML
 metadata, so you can track changes with Git and share a reproducible pack without committing every downloaded mod file.
 
