@@ -18,12 +18,12 @@
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
 
       # Bump these when a tagged release is published; hashes are for the release archives.
-      releaseVersion = "0.1.0";
+      releaseVersion = "0.2.0";
       releaseHashes = {
-        "x86_64-linux" = "sha256-7PsDFMUSjp6r5Gb0OxsV+v+4dm1wGToPFPUkNTroFgA=";
-        "aarch64-linux" = "sha256-CEr8cAQqwpAw8W5LHMn2mToYKapt3gA3oPBYFBDQZfs=";
-        "x86_64-darwin" = "sha256-jslOMwiVnxeHX4cN61cBkjdDPP9XUidivPxOyjfS7cg=";
-        "aarch64-darwin" = "sha256-B993le/KTgMKRLLWxEM5Yf2wc28dTpu+yhLOok+2nGo=";
+        "x86_64-linux" = "sha256-p4/UNRX+rIb7VSv2JzrrxxnFd116KudCNJ/Eqtav0Z0=";
+        "aarch64-linux" = "sha256-nwmYVuDemZyeE8UYGu9Ksn2PHSjlW4gIQ5ZUosMgtyw=";
+        "x86_64-darwin" = "sha256-zhMoPTUlglgKdqR7BBF+AFp3+FunTmHxDjCyytP7kXY=";
+        "aarch64-darwin" = "sha256-dNfZ/4yw5m8UVazVHuegvBGlNXzfPN/JKgzECsAWVwE=";
       };
     in
     {
